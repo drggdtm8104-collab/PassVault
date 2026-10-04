@@ -21,7 +21,9 @@ export function toText(entries: Entry[], now = Date.now()): string {
     lines.push('----------------------------------------');
     lines.push(`サイト名: ${e.title}`);
     if (e.url) lines.push(`URL: ${e.url}`);
-    lines.push(`ID: ${e.username}`);
+    lines.push(`ログインID: ${e.username}`);
+    if (e.email) lines.push(`登録メール: ${e.email}`);
+    if (e.displayName) lines.push(`ユーザー名: ${e.displayName}`);
     lines.push(`パスワード: ${e.password}`);
     if (e.note) {
       lines.push('メモ:');
@@ -42,6 +44,12 @@ function csvField(v: string): string {
  */
 export function toCsv(entries: Entry[]): string {
   const rows = [['Title', 'URL', 'Username', 'Password', 'Notes', 'OTPAuth']];
-  for (const e of entries) rows.push([e.title, e.url, e.username, e.password, e.note, '']);
+  for (const e of entries) {
+    // 取り込み先に専用の列が無いので、登録メールとユーザー名はメモに追記する
+    const notes = [e.note, e.email && `登録メール: ${e.email}`, e.displayName && `ユーザー名: ${e.displayName}`]
+      .filter(Boolean)
+      .join('\n');
+    rows.push([e.title, e.url, e.username, e.password, notes, '']);
+  }
   return rows.map((r) => r.map(csvField).join(',')).join('\r\n') + '\r\n';
 }

@@ -3,7 +3,12 @@
 export interface Entry {
   id: string;
   title: string;
+  /** ログイン ID（ログイン画面で入力するもの。メールアドレス・ユーザー名・会員番号など） */
   username: string;
+  /** 登録メールアドレス（ログイン ID と別の場合だけ） */
+  email: string;
+  /** ユーザー名・表示名（ログインに使わない名前がある場合だけ） */
+  displayName: string;
   password: string;
   url: string;
   note: string;
@@ -55,6 +60,8 @@ export function normalizePayload(x: unknown): Payload {
       id: str(e?.id) || crypto.randomUUID(),
       title: str(e?.title),
       username: str(e?.username),
+      email: str(e?.email),
+      displayName: str(e?.displayName),
       password: str(e?.password),
       url: str(e?.url),
       note: str(e?.note),

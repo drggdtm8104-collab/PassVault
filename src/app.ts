@@ -675,8 +675,10 @@ function detailScreen(id: string): HTMLElement {
     e.title || '（名前なし）',
     [button('一覧', () => show(listScreen())), ro ? null : button('編集', () => show(editScreen(e.id)), 'small')].filter(Boolean) as Node[],
     h('div', { class: 'card' },
-      row('ID', h('span', { class: 'mono' }, e.username || '—'), e.username ? button('コピー', () => void copyText(e.username, 'ID'), 'small') : ''),
+      row('ログイン ID', h('span', { class: 'mono' }, e.username || '—'), e.username ? button('コピー', () => void copyText(e.username, 'ログイン ID'), 'small') : ''),
       row('パスワード', pwText, revealBtn, e.password ? button('コピー', () => void copyText(e.password, 'パスワード'), 'small') : ''),
+      e.email ? row('登録メール', h('span', { class: 'mono' }, e.email), button('コピー', () => void copyText(e.email, 'メールアドレス'), 'small')) : null,
+      e.displayName ? row('ユーザー名', h('span', null, e.displayName), button('コピー', () => void copyText(e.displayName, 'ユーザー名'), 'small')) : null,
       e.url ? row('URL', h('span', { class: 'mono' }, e.url), url ? button('開く', () => window.open(url, '_blank', 'noopener,noreferrer'), 'small') : '') : null,
       e.note ? row('メモ', h('span', { class: 'note' }, e.note)) : null,
     ),
@@ -726,10 +728,24 @@ function generatorPanel(onUse: (pw: string) => void): HTMLElement {
   );
 }
 
+/** 値があるときだけ欄を出し、無いときは「＋ ラベル」ボタンにしておく */
+function optionalField(label: string, input: HTMLInputElement, hint: string): HTMLElement {
+  const wrap = h('div', { class: 'add-slot' });
+  const reveal = () => {
+    wrap.classList.add('full');
+    wrap.replaceChildren(field(label, input, hint));
+  };
+  if (input.value) reveal();
+  else wrap.append(button(`＋ ${label}`, () => { reveal(); input.focus(); }, 'small'));
+  return wrap;
+}
+
 function editScreen(id: string | null): HTMLElement {
   const e = id ? findEntry(id) : undefined;
   const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: '例：Amazon' });
-  const username = textInput(e?.username ?? '', { placeholder: 'メールアドレスやユーザー名' });
+  const username = textInput(e?.username ?? '', { placeholder: 'メールアドレス、ユーザー名、会員番号など' });
+  const email = textInput(e?.email ?? '', { type: 'email', placeholder: 'me@example.com' });
+  const displayName = textInput(e?.displayName ?? '', { placeholder: 'ニックネームや表示名' });
   const password = secretInput({ autocomplete: 'new-password' });
   password.value = e?.password ?? '';
   const url = textInput(e?.url ?? '', { type: 'url', placeholder: 'https://' });
@@ -761,6 +777,8 @@ function editScreen(id: string | null): HTMLElement {
         id: e?.id ?? crypto.randomUUID(),
         title: title.value.trim(),
         username: username.value.trim(),
+        email: email.value.trim(),
+        displayName: displayName.value.trim(),
         password: password.value,
         url: url.value.trim(),
         note: note.value,
@@ -781,9 +799,13 @@ function editScreen(id: string | null): HTMLElement {
     e ? '編集' : '追加',
     [button('キャンセル', () => show(e ? detailScreen(e.id) : listScreen()))],
     field('サイト名', title),
-    field('ID', username),
+    field('ログイン ID', username, 'ログイン画面で入力するもの'),
     field('パスワード', h('div', { class: 'row' }, withRevealToggle(password), genBtn)),
     genSlot,
+    h('div', { class: 'adds' },
+      optionalField('登録メールアドレス', email, 'ログイン ID と別のときだけ'),
+      optionalField('ユーザー名', displayName, 'ログインに使わない表示名など'),
+    ),
     field('URL', url),
     field('メモ', note),
     err,

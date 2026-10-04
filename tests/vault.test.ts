@@ -25,6 +25,8 @@ function samplePayload(): Payload {
     id: 'a',
     title: 'Example',
     username: 'me@example.com',
+    email: '',
+    displayName: '',
     password: 'p@ss"word,\n改行',
     url: 'https://example.com',
     note: 'メモ',
