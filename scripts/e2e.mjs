@@ -58,10 +58,14 @@ step('金庫を作成できる');
 // 追加（生成器を使う）
 await btn(page, '追加').click();
 await page.getByLabel('名前', { exact: true }).fill('Example <script>alert(1)</script>');
+assert.equal(await page.getByRole('tab', { name: 'ログイン' }).getAttribute('aria-selected'), 'true', '最初はログインが選ばれている');
 await page.getByLabel('ログイン ID').fill('me@example.com');
 assert.equal(await page.getByLabel('登録メールアドレス').count(), 0, '任意の欄は最初は隠れている');
 await btn(page, '＋ 登録メールアドレス').click();
 await page.getByLabel('登録メールアドレス').fill('contact@example.com');
+const hEmail = (await page.getByLabel('登録メールアドレス').boundingBox()).height;
+const hId = (await page.getByLabel('ログイン ID').boundingBox()).height;
+assert.equal(hEmail, hId, `メール欄の高さ ${hEmail} が他の欄 ${hId} と同じ`);
 await btn(page, '生成').click();
 await shot(page, '03-generator');
 await btn(page, 'これを使う').click();
@@ -129,7 +133,7 @@ step('検索：全角・登録メール・複数語で見つかり、無けれ�
 
 // 種類：Wi-Fi と銀行・カードを登録し、種類で絞り込む
 await btn(page, '追加').click();
-await btn(page, 'Wi-Fi').click();
+await page.getByRole('tab', { name: 'Wi-Fi' }).click();
 assert.equal(await page.getByLabel('URL').count(), 0, 'Wi-Fi に URL 欄は無い');
 await page.getByLabel('名前', { exact: true }).fill('自宅の Wi-Fi');
 await page.getByLabel('ネットワーク名（SSID）').fill('MyHomeNet');
@@ -140,7 +144,7 @@ await page.getByText('MyHomeNet').waitFor();
 await btn(page, '一覧').click();
 
 await btn(page, '追加').click();
-await btn(page, '銀行・カード').click();
+await page.getByRole('tab', { name: '銀行・カード' }).click();
 await page.getByLabel('名前', { exact: true }).fill('楽天銀行');
 await page.getByLabel('口座番号・カード番号').fill('普通 1234567');
 await page.getByLabel('暗証番号').fill('4321');

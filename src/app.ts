@@ -793,7 +793,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement
   const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: kindDef(kind).titlePlaceholder });
   // 種類を切り替えても入力途中の値を失わないよう、値は欄の外で持つ
   const values = Object.fromEntries(ALL_FIELD_KEYS.map((k) => [k, e?.[k] ?? ''])) as Record<FieldKey, string>;
-  const kindChips = h('div', { class: 'chips', role: 'group', 'aria-label': '種類' });
+  const kindTabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': '種類' });
   const fieldsBox = h('div', { class: 'stack fields' });
   const err = h('p', { class: 'error', role: 'alert' });
 
@@ -815,8 +815,16 @@ function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement
   const renderFields = () => {
     const def = kindDef(kind);
     title.placeholder = def.titlePlaceholder;
-    clear(kindChips);
-    for (const k of KINDS) kindChips.append(chip(k.label, k.id === kind, () => { kind = k.id; renderFields(); }));
+    clear(kindTabs);
+    for (const k of KINDS) {
+      kindTabs.append(h('button', {
+        type: 'button',
+        class: 'tab',
+        role: 'tab',
+        'aria-selected': String(k.id === kind),
+        on: { click: () => { kind = k.id; renderFields(); } },
+      }, k.label));
+    }
 
     clear(fieldsBox);
     let adds: HTMLElement | null = null;
@@ -889,7 +897,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement
   return screen(
     e ? '編集' : '追加',
     [button('キャンセル', () => show(e ? detailScreen(e.id) : listScreen()))],
-    field('種類', kindChips),
+    kindTabs,
     field('名前', title, '同じサービスが複数あるときは「X（仕事用）」のように区別すると探しやすくなります'),
     fieldsBox,
     err,

@@ -83,7 +83,7 @@ button.small { min-height: 36px; padding: 4px 12px; font-size: 0.9rem; }
 button:disabled { opacity: 0.5; }
 main > button { width: 100%; }
 
-input[type=text], input[type=password], input[type=search], input[type=url], textarea, select {
+input[type=text], input[type=password], input[type=search], input[type=url], input[type=email], textarea, select {
   font: inherit;
   font-size: 16px; /* iOS の自動ズーム防止 */
   width: 100%;
@@ -174,3 +174,7 @@ details.trouble summary { color: var(--muted); cursor: pointer; padding: 8px 0; 
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 .badge { display: inline-block; margin-left: 8px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; font-weight: 400; color: var(--muted); vertical-align: 2px; }
 .fields > * + * { margin-top: 0; }
+
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 6px 6px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; color: var(--muted); font-size: 0.85rem; white-space: nowrap; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
