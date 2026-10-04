@@ -24,6 +24,7 @@ function samplePayload(): Payload {
   p.entries.push({
     id: 'a',
     kind: 'login',
+    favorite: false,
     title: 'Example',
     username: 'me@example.com',
     email: '',
@@ -146,6 +147,9 @@ test('復号した中身の欠けや型違いを補正する', () => {
   assert.equal(p.entries[0].title, '');
   assert.equal(p.entries[0].kind, 'login', '種類の無い古いデータはログイン扱い');
   assert.equal(p.entries[0].pin, '');
+  assert.equal(p.entries[0].favorite, false, 'お気に入りは true のときだけ有効');
+  assert.equal(normalizePayload({ entries: [{ favorite: 'yes' }] }).entries[0].favorite, false);
+  assert.equal(normalizePayload({ entries: [{ favorite: true }] }).entries[0].favorite, true);
   assert.equal(p.entries[0].password, 'x');
   assert.ok(p.entries[0].id);
   assert.equal(p.settings.autoLockMinutes, 3);

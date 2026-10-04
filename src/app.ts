@@ -598,8 +598,13 @@ function needsBackup(p: Payload): boolean {
   return p.modifiedAt > p.lastBackupAt && Date.now() - p.lastBackupAt > 7 * 24 * 3600_000;
 }
 
-/** 一覧の種類での絞り込み（ロックするまで覚えておく） */
-let listFilter: Kind | 'all' = 'all';
+/** 一覧の絞り込み（すべて・お気に入り・種類）。ロックするまで覚えておく */
+type ListFilter = Kind | 'all' | 'fav';
+let listFilter: ListFilter = 'all';
+
+function inFilter(e: Entry, f: ListFilter): boolean {
+  return f === 'all' || (f === 'fav' ? e.favorite : e.kind === f);
+}
 
 function chip(label: string, pressed: boolean, onClick: () => void): HTMLButtonElement {
   return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), on: { click: onClick } }, label);
@@ -612,10 +617,10 @@ function listScreen(query = ''): HTMLElement {
   const list = h('ul', { class: 'list' });
 
   const renderChips = () => {
-    const count = (k: Kind | 'all') => (k === 'all' ? s.payload.entries : s.payload.entries.filter((e) => e.kind === k)).length;
+    const count = (k: ListFilter) => s.payload.entries.filter((e) => inFilter(e, k)).length;
     clear(chips);
-    for (const k of ['all', ...KIND_IDS] as const) {
-      const label = k === 'all' ? 'すべて' : kindDef(k).label;
+    for (const k of ['all', 'fav', ...KIND_IDS] as const) {
+      const label = k === 'all' ? 'すべて' : k === 'fav' ? '★ お気に入り' : kindDef(k).label;
       chips.append(chip(`${label} ${count(k)}`, listFilter === k, () => {
         listFilter = k;
         renderChips();
@@ -627,7 +632,7 @@ function listScreen(query = ''): HTMLElement {
   const render = () => {
     const terms = parseQuery(search.value);
     const items = s.payload.entries
-      .filter((e) => (listFilter === 'all' || e.kind === listFilter) && matchesQuery(e, terms))
+      .filter((e) => inFilter(e, listFilter) && matchesQuery(e, terms))
       .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     clear(list);
     if (items.length === 0) {
@@ -637,8 +642,9 @@ function listScreen(query = ''): HTMLElement {
       list.append(h('li', null,
         h('button', { type: 'button', class: 'item', on: { click: () => show(detailScreen(e.id)) } },
           h('span', { class: 'title' },
+            e.favorite ? h('span', { class: 'star', 'aria-label': 'お気に入り' }, '★') : null,
             e.title || '（名前なし）',
-            listFilter === 'all' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
+            listFilter === 'all' || listFilter === 'fav' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
           ),
           h('span', { class: 'sub' }, subtitle(e)),
         ),
@@ -652,7 +658,7 @@ function listScreen(query = ''): HTMLElement {
   const actions = s.readOnly
     ? [button('終了', () => lock())]
     : [
-        button('追加', () => show(editScreen(null, listFilter === 'all' ? 'login' : listFilter)), 'primary small'),
+        button('追加', () => show(editScreen(null, listFilter === 'all' || listFilter === 'fav' ? 'login' : listFilter, listFilter === 'fav')), 'primary small'),
         button('設定', () => show(settingsScreen()), 'small'),
         button('ロック', () => lock(), 'small'),
       ];
@@ -684,6 +690,28 @@ function safeUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** お気に入りの切り替えボタン（中身の変更ではないので更新日時は変えない） */
+function favButton(e: Entry): HTMLButtonElement {
+  const b = h('button', {
+    type: 'button',
+    class: 'small fav',
+    'aria-pressed': String(e.favorite),
+    'aria-label': e.favorite ? 'お気に入りから外す' : 'お気に入りに追加',
+  }, e.favorite ? '★' : '☆');
+  b.addEventListener('click', () => {
+    const next = !e.favorite;
+    void busy(b, '…', async () => {
+      await commit((p) => {
+        const x = p.entries.find((y) => y.id === e.id);
+        if (x) x.favorite = next;
+      });
+      show(detailScreen(e.id));
+      toast(next ? 'お気に入りに追加しました' : 'お気に入りから外しました');
+    });
+  });
+  return b;
 }
 
 function detailScreen(id: string): HTMLElement {
@@ -722,7 +750,11 @@ function detailScreen(id: string): HTMLElement {
 
   return screen(
     e.title || '（名前なし）',
-    [button('一覧', () => show(listScreen())), ro ? null : button('編集', () => show(editScreen(e.id)), 'small')].filter(Boolean) as Node[],
+    [
+      button('一覧', () => show(listScreen())),
+      ro ? null : favButton(e),
+      ro ? null : button('編集', () => show(editScreen(e.id)), 'small'),
+    ].filter(Boolean) as Node[],
     rows.some(Boolean) ? h('div', { class: 'card' }, ...rows) : h('p', { class: 'muted' }, '名前以外は未入力です。'),
     h('p', { class: 'muted' }, `種類：${def.label}　更新：${formatDate(e.updatedAt)}`),
     ro ? null : button('削除', () => {
@@ -787,7 +819,7 @@ function optionalField(label: string, input: FieldInput, hint?: string): HTMLEle
 
 const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'number', 'pin', 'server', 'url', 'note'];
 
-function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement {
+function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false): HTMLElement {
   const e = id ? findEntry(id) : undefined;
   let kind: Kind = e?.kind ?? defaultKind;
   const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: kindDef(kind).titlePlaceholder });
@@ -879,6 +911,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement
       const entry = clearUnusedFields({
         id: e?.id ?? crypto.randomUUID(),
         kind,
+        favorite: e?.favorite ?? defaultFavorite,
         title: title.value.trim(),
         ...(Object.fromEntries(ALL_FIELD_KEYS.map((k) => [k, clean(k)])) as Record<FieldKey, string>),
         createdAt: e?.createdAt ?? now,

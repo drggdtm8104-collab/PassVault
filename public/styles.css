@@ -106,6 +106,9 @@ textarea { resize: vertical; }
 .check input { width: 20px; height: 20px; flex-shrink: 0; }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .hidden { display: none; }
+.star { color: #e0a100; margin-right: 4px; }
+button.fav { font-size: 1.1rem; min-width: 44px; }
+button.fav[aria-pressed="true"] { color: #e0a100; border-color: #e0a100; }
 .adds { display: flex; flex-wrap: wrap; gap: 8px; }
 .add-slot.full { flex-basis: 100%; }
 

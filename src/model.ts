@@ -7,6 +7,8 @@ export interface Entry {
   /** 種類（ログイン・メール・銀行カード・Wi-Fi・メモ）。種類によって使う欄が変わる（kinds.ts） */
   kind: Kind;
   title: string;
+  /** お気に入り */
+  favorite: boolean;
   /** ログイン ID（ログイン画面で入力するもの。メールアドレス・ユーザー名・会員番号など） */
   username: string;
   /** 登録メールアドレス（ログイン ID と別の場合だけ） */
@@ -71,6 +73,7 @@ export function normalizePayload(x: unknown): Payload {
       // 種類が無いのは種類導入前のデータなので「ログイン」として扱う
       kind: isKind(e?.kind) ? e.kind : 'login',
       title: str(e?.title),
+      favorite: e?.favorite === true,
       username: str(e?.username),
       email: str(e?.email),
       displayName: str(e?.displayName),
