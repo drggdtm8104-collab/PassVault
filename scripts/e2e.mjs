@@ -57,7 +57,7 @@ step('金庫を作成できる');
 
 // 追加（生成器を使う）
 await btn(page, '追加').click();
-await page.getByLabel('サイト名').fill('Example <script>alert(1)</script>');
+await page.getByLabel('名前', { exact: true }).fill('Example <script>alert(1)</script>');
 await page.getByLabel('ログイン ID').fill('me@example.com');
 assert.equal(await page.getByLabel('登録メールアドレス').count(), 0, '任意の欄は最初は隠れている');
 await btn(page, '＋ 登録メールアドレス').click();

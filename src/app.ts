@@ -742,7 +742,7 @@ function optionalField(label: string, input: HTMLInputElement, hint: string): HT
 
 function editScreen(id: string | null): HTMLElement {
   const e = id ? findEntry(id) : undefined;
-  const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: '例：Amazon' });
+  const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: '例：Amazon、Gmail（仕事用）、自宅の Wi-Fi' });
   const username = textInput(e?.username ?? '', { placeholder: 'メールアドレス、ユーザー名、会員番号など' });
   const email = textInput(e?.email ?? '', { type: 'email', placeholder: 'me@example.com' });
   const displayName = textInput(e?.displayName ?? '', { placeholder: 'ニックネームや表示名' });
@@ -768,7 +768,7 @@ function editScreen(id: string | null): HTMLElement {
   const save = button('保存', () => {
     err.textContent = '';
     if (!title.value.trim()) {
-      err.textContent = 'サイト名を入力してください。';
+      err.textContent = '名前を入力してください。';
       return;
     }
     void busy(save, '保存中…', async () => {
@@ -798,7 +798,7 @@ function editScreen(id: string | null): HTMLElement {
   return screen(
     e ? '編集' : '追加',
     [button('キャンセル', () => show(e ? detailScreen(e.id) : listScreen()))],
-    field('サイト名', title),
+    field('名前', title, '同じサービスが複数あるときは「X（仕事用）」のように区別すると探しやすくなります'),
     field('ログイン ID', username, 'ログイン画面で入力するもの'),
     field('パスワード', h('div', { class: 'row' }, withRevealToggle(password), genBtn)),
     genSlot,

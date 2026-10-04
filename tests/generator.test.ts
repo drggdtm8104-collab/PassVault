@@ -65,7 +65,7 @@ test('CSV は特殊文字を正しくエスケープし、値を書き換えな�
 
 test('テキスト書き出しに全項目が含まれる', () => {
   const txt = toText(entries, 0);
-  for (const s of ['A, "B"', 'https://a.example', 'ログインID: u', '登録メール: mail@example.com', 'パスワード: =1+2', '  2行目', '件数: 1']) {
+  for (const s of ['名前: A, "B"', 'https://a.example', 'ログインID: u', '登録メール: mail@example.com', 'パスワード: =1+2', '  2行目', '件数: 1']) {
     assert.ok(!txt.includes('ユーザー名:'), '空の項目は出さない');
     assert.ok(txt.includes(s), s);
   }

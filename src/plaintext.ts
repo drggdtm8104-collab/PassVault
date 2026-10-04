@@ -19,7 +19,7 @@ export function toText(entries: Entry[], now = Date.now()): string {
   ];
   for (const e of entries) {
     lines.push('----------------------------------------');
-    lines.push(`サイト名: ${e.title}`);
+    lines.push(`名前: ${e.title}`);
     if (e.url) lines.push(`URL: ${e.url}`);
     lines.push(`ログインID: ${e.username}`);
     if (e.email) lines.push(`登録メール: ${e.email}`);
