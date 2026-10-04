@@ -6,6 +6,7 @@ import { clear, h } from './dom.ts';
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
+import { matchesQuery, parseQuery } from './search.ts';
 import {
   deleteBio,
   deleteVault,
@@ -597,13 +598,13 @@ function needsBackup(p: Payload): boolean {
 
 function listScreen(query = ''): HTMLElement {
   const s = session!;
-  const search = textInput(query, { type: 'search', placeholder: '検索' });
+  const search = textInput(query, { type: 'search', placeholder: '検索（名前・ID・メール・メモ）' });
   const list = h('ul', { class: 'list' });
 
   const render = () => {
-    const q = search.value.trim().toLowerCase();
+    const terms = parseQuery(search.value);
     const items = s.payload.entries
-      .filter((e) => !q || [e.title, e.username, e.url].some((v) => v.toLowerCase().includes(q)))
+      .filter((e) => matchesQuery(e, terms))
       .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     clear(list);
     if (items.length === 0) {

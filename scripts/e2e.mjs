@@ -116,6 +116,17 @@ await btn(page, '開く').click();
 await page.getByText('Example <script>', { exact: false }).waitFor();
 step('間違ったパスワードでは開かず、正しいパスワードで開く');
 
+// 検索（全角・登録メール・複数語）
+const search = page.getByPlaceholder('検索', { exact: false });
+await search.fill('ｅｘａｍｐｌｅ');
+await page.getByText('Example <script>', { exact: false }).waitFor();
+await search.fill('contact example');
+await page.getByText('Example <script>', { exact: false }).waitFor();
+await search.fill('存在しない');
+await page.getByText('見つかりません').waitFor();
+await search.fill('');
+step('検索：全角・登録メール・複数語で見つかり、無ければ「見つかりません」');
+
 // 暗号化バックアップ
 await btn(page, '設定').click();
 const [dl] = await Promise.all([page.waitForEvent('download'), btn(page, '暗号化バックアップを保存').click()]);
