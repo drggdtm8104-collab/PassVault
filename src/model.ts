@@ -16,6 +16,8 @@ export interface Settings {
   autoLockMinutes: number;
   /** コピー後にクリップボード消去を試みるまでの秒数 */
   clipboardClearSeconds: number;
+  /** アプリを離れてから、解除なしで戻れる秒数（0 = すぐロック） */
+  relockGraceSeconds: number;
 }
 
 export interface Payload {
@@ -28,11 +30,12 @@ export interface Payload {
 }
 
 export const AUTO_LOCK_CHOICES = [1, 3, 5, 10];
+export const RELOCK_GRACE_CHOICES = [0, 60, 300];
 
 export function emptyPayload(): Payload {
   return {
     entries: [],
-    settings: { autoLockMinutes: 3, clipboardClearSeconds: 30 },
+    settings: { autoLockMinutes: 3, clipboardClearSeconds: 30, relockGraceSeconds: 0 },
     modifiedAt: Date.now(),
     lastBackupAt: null,
   };
@@ -63,6 +66,9 @@ export function normalizePayload(x: unknown): Payload {
         ? (s.autoLockMinutes as number)
         : base.settings.autoLockMinutes,
       clipboardClearSeconds: num(s.clipboardClearSeconds, base.settings.clipboardClearSeconds),
+      relockGraceSeconds: RELOCK_GRACE_CHOICES.includes(s.relockGraceSeconds as number)
+        ? (s.relockGraceSeconds as number)
+        : base.settings.relockGraceSeconds,
     },
     modifiedAt: num(p.modifiedAt, base.modifiedAt),
     lastBackupAt: typeof p.lastBackupAt === 'number' ? p.lastBackupAt : null,

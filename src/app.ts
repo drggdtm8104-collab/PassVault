@@ -1,15 +1,20 @@
 // 画面と操作。解除中のデータはメモリ上の session にだけ置き、ロック時に破棄する。
 
+import { BioCancelledError, BioUnavailableError, bioAvailable, enrollBio, unlockBio, type BioRecord } from './biometric.ts';
+import { wipe } from './bytes.ts';
 import { clear, h } from './dom.ts';
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
-import { AUTO_LOCK_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
+import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
 import {
+  deleteBio,
   deleteVault,
+  loadBio,
   loadVault,
   recordFailure,
   requestPersistence,
   resetFailures,
+  saveBio,
   saveVault,
   throttleRemaining,
 } from './storage.ts';
@@ -21,6 +26,8 @@ import {
   parseVaultFile,
   resealVault,
   unlockVault,
+  unlockWithRawDek,
+  unwrapDek,
   verifyPassword,
   WrongPasswordError,
   type VaultFile,
@@ -250,12 +257,65 @@ function resetIdle(): void {
   idleTimer = window.setTimeout(() => lock('しばらく操作がなかったのでロックしました'), session.payload.settings.autoLockMinutes * 60_000);
 }
 
+/** ロック時にゼロで消す一時的な鍵素材（Face ID 登録の 2 段階目まで保持する DEK など） */
+const pendingSecrets = new Set<Uint8Array>();
+
 function lock(message?: string): void {
   const wasReadOnly = session?.readOnly;
   session = null;
+  parked = null;
   clearTimeout(idleTimer);
   clearClipboardIfDue(true);
+  for (const b of pendingSecrets) wipe(b);
+  pendingSecrets.clear();
   void start(message ?? (wasReadOnly ? '閲覧を終了しました' : undefined));
+}
+
+function enterSession(file: VaultFile, dek: CryptoKey, payload: unknown, readOnly = false): void {
+  session = { file, dek, payload: normalizePayload(payload), readOnly };
+  autoBio = null;
+  if (!readOnly) void requestPersistence();
+  resetIdle();
+  show(listScreen());
+}
+
+// ---------------------------------------------------------------- アプリを離れたとき
+//
+// 既定ではすぐロックする。猶予を設定した場合も、離れている間は画面の中身を外して隠し、
+// 猶予を過ぎて戻ったらロックする（iOS がアプリを終了させた場合はメモリごと消える）。
+
+let parked: Node[] | null = null;
+let hiddenAt = 0;
+/** Face ID の登録中など、システムの画面が一時的に重なる間はロックしない */
+let suppressLock = 0;
+/** ロック画面が表示されたときに Face ID を自動で求める処理 */
+let autoBio: (() => void) | null = null;
+
+function onHidden(): void {
+  if (!session || suppressLock > 0) return;
+  const grace = session.payload.settings.relockGraceSeconds;
+  if (grace <= 0 || session.readOnly) {
+    lock();
+    return;
+  }
+  hiddenAt = Date.now();
+  parked = [...root.childNodes];
+  root.replaceChildren(h('div', { class: 'cover' }, h('p', null, 'PassVault')));
+}
+
+function onVisible(): void {
+  if (parked && session) {
+    const nodes = parked;
+    parked = null;
+    if (Date.now() - hiddenAt <= session.payload.settings.relockGraceSeconds * 1000) {
+      root.replaceChildren(...nodes);
+      resetIdle();
+    } else {
+      lock();
+    }
+    return;
+  }
+  autoBio?.();
 }
 
 // ---------------------------------------------------------------- 保存
@@ -276,8 +336,9 @@ async function commit(mutate: (p: Payload) => void, opts: { touch?: boolean } = 
 // ---------------------------------------------------------------- 起動・初期設定
 
 export async function start(message?: string): Promise<void> {
+  autoBio = null;
   const file = await loadVault();
-  if (file) show(unlockScreen(file, message));
+  if (file) show(unlockScreen(file, await loadBio(), message));
   else show(welcomeScreen(message));
 }
 
@@ -329,11 +390,8 @@ function createScreen(): HTMLElement {
       const { file, dek } = await createVault(pw1.value, payload);
       await saveVault(file);
       pw1.value = pw2.value = '';
-      session = { file, dek, payload, readOnly: false };
-      void requestPersistence();
-      resetIdle();
-      show(listScreen());
-      toast('金庫を作成しました');
+      enterSession(file, dek, payload);
+      toast((await bioAvailable()) ? '金庫を作成しました。設定から Face ID を有効にできます' : '金庫を作成しました');
     });
   }, 'primary');
 
@@ -355,14 +413,14 @@ function createScreen(): HTMLElement {
   );
 }
 
-function unlockScreen(file: VaultFile, message?: string): HTMLElement {
-  const pw = secretInput({ autofocus: true, autocomplete: 'current-password' });
+function unlockScreen(file: VaultFile, bio: BioRecord | null, message?: string): HTMLElement {
+  const pw = secretInput({ autofocus: !bio, autocomplete: 'current-password' });
   const err = h('p', { class: 'error', role: 'alert' });
   let tick = 0;
 
-  const submit = button('開く', () => void tryUnlock(), 'primary');
+  const submit = button('開く', () => void tryUnlock(), bio ? '' : 'primary');
   const form = h('form', { on: { submit: (e) => { e.preventDefault(); void tryUnlock(); } } },
-    field('マスターパスワード', withRevealToggle(pw)),
+    field(bio ? 'またはマスターパスワードで開く' : 'マスターパスワード', withRevealToggle(pw)),
     err,
     submit,
   );
@@ -390,10 +448,7 @@ function unlockScreen(file: VaultFile, message?: string): HTMLElement {
         const u = await unlockVault<unknown>(file, pw.value);
         pw.value = '';
         resetFailures();
-        session = { file, dek: u.dek, payload: normalizePayload(u.payload), readOnly: false };
-        void requestPersistence();
-        resetIdle();
-        show(listScreen());
+        enterSession(file, u.dek, u.payload);
       } catch (e) {
         if (!(e instanceof WrongPasswordError)) throw e;
         recordFailure();
@@ -404,12 +459,61 @@ function unlockScreen(file: VaultFile, message?: string): HTMLElement {
     showWait();
   }
 
+  const bioBtn = bio ? button('Face ID で開く', () => void tryBio(false), 'primary') : null;
+  let bioBusy = false;
+
+  async function tryBio(auto: boolean): Promise<void> {
+    if (!bio || !bioBtn || bioBusy || document.hidden) return;
+    bioBusy = true;
+    err.textContent = '';
+    try {
+      await busy(bioBtn, '認証中…', async () => {
+        try {
+          const raw = await unlockBio(bio);
+          try {
+            const u = await unlockWithRawDek<unknown>(file, raw);
+            resetFailures();
+            enterSession(file, u.dek, u.payload);
+          } finally {
+            wipe(raw);
+          }
+        } catch (e) {
+          if (e instanceof BioCancelledError) {
+            if (!auto) err.textContent = 'Face ID で開けませんでした。もう一度試すか、マスターパスワードで開いてください。';
+          } else if (e instanceof WrongPasswordError) {
+            // 金庫が置き換わったなどで、包んだ鍵が合わなくなった
+            await deleteBio();
+            bioBtn.remove();
+            err.textContent = 'Face ID の設定が無効になりました。マスターパスワードで開いてから、設定で有効にし直してください。';
+          } else if (e instanceof BioUnavailableError) {
+            err.textContent = e.message;
+          } else {
+            throw e;
+          }
+        }
+      });
+    } finally {
+      bioBusy = false;
+    }
+  }
+
   queueMicrotask(showWait);
+  if (bio) {
+    // 表示されたら一度だけ自動で Face ID を求める（ユーザー操作が必要な環境では失敗するのでボタンで）
+    let tried = false;
+    autoBio = () => {
+      if (tried || document.hidden) return;
+      tried = true;
+      void tryBio(true);
+    };
+    queueMicrotask(() => autoBio?.());
+  }
 
   return screen(
     'PassVault',
     [],
     message ? h('p', { class: 'banner' }, message) : null,
+    bioBtn,
     form,
     h('details', { class: 'trouble' },
       h('summary', null, '困ったとき'),
@@ -454,14 +558,13 @@ async function restoreFlow(mode: 'restore' | 'view'): Promise<void> {
       try {
         const u = await unlockVault<unknown>(file, pw.value);
         pw.value = '';
-        if (mode === 'restore') await saveVault(file);
-        session = { file, dek: u.dek, payload: normalizePayload(u.payload), readOnly: mode === 'view' };
         if (mode === 'restore') {
+          await saveVault(file);
+          // データ鍵が変わるので、以前の Face ID の設定は使えない
+          await deleteBio();
           resetFailures();
-          void requestPersistence();
         }
-        resetIdle();
-        show(listScreen());
+        enterSession(file, u.dek, u.payload, mode === 'view');
         toast(mode === 'restore' ? '復元しました。今後はバックアップ時のマスターパスワードで開きます' : 'バックアップを開きました');
       } catch (e) {
         if (!(e instanceof WrongPasswordError)) throw e;
@@ -719,6 +822,37 @@ function settingsScreen(): HTMLElement {
     });
   });
 
+  const grace = h('select', null,
+    ...RELOCK_GRACE_CHOICES.map((sec) => h('option', { value: String(sec), selected: sec === s.payload.settings.relockGraceSeconds },
+      sec === 0 ? 'すぐにロック（おすすめ）' : `${sec / 60} 分以内に戻れば解除不要`)),
+  );
+  grace.addEventListener('change', () => {
+    void commit((p) => { p.settings.relockGraceSeconds = Number(grace.value); }, { touch: false }).then(() => toast('変更しました'));
+  });
+
+  const bioSlot = h('div', { class: 'stack' }, h('p', { class: 'muted' }, '確認中…'));
+  void Promise.all([loadBio(), bioAvailable()]).then(([rec, available]) => {
+    clear(bioSlot);
+    if (rec) {
+      bioSlot.append(
+        h('p', null, '✅ 有効です（この端末のみ）'),
+        button('Face ID を無効にする', () => {
+          void deleteBio().then(() => {
+            show(settingsScreen());
+            toast('Face ID を無効にしました。「パスワード」アプリの PassVault のパスキーも削除できます');
+          });
+        }),
+      );
+    } else if (available) {
+      bioSlot.append(
+        h('p', null, '毎回のマスターパスワード入力の代わりに、Face ID で開けるようにします。'),
+        button('Face ID を有効にする', () => show(bioEnrollScreen()), 'primary'),
+      );
+    } else {
+      bioSlot.append(h('p', { class: 'muted' }, 'この端末・ブラウザでは使えません。'));
+    }
+  });
+
   const persisted = h('span', null, '確認中…');
   navigator.storage?.persisted?.().then((v) => { persisted.textContent = v ? '保護されています' : '保護されていません（ブラウザが削除する可能性あり）'; })
     .catch(() => { persisted.textContent = '不明'; });
@@ -733,8 +867,15 @@ function settingsScreen(): HTMLElement {
       button('暗号化バックアップを保存', () => void backupNow(), 'primary'),
     ),
     h('section', null,
+      h('h2', null, 'Face ID'),
+      bioSlot,
+    ),
+    h('section', null,
       h('h2', null, '自動ロック'),
-      field('操作がないときにロックするまで', autoLock, 'アプリを閉じたり別のアプリに切り替えたりすると、すぐにロックします。'),
+      h('div', { class: 'stack' },
+        field('操作がないときにロックするまで', autoLock),
+        field('アプリを離れたとき', grace, '猶予を付けても、離れている間は画面の中身を隠します。iPhone がアプリを終了させた場合はロックされます。'),
+      ),
     ),
     h('section', null,
       h('h2', null, 'マスターパスワード'),
@@ -764,6 +905,68 @@ function settingsScreen(): HTMLElement {
         h('li', null, '保存場所：この端末のみ（通信なし） ／ ', persisted),
       ),
     ),
+  );
+}
+
+function bioEnrollScreen(): HTMLElement {
+  const pw = secretInput({ autofocus: true, autocomplete: 'current-password' });
+  const err = h('p', { class: 'error', role: 'alert' });
+  const step2 = h('div');
+
+  const verify = button('確認する', () => {
+    err.textContent = '';
+    clear(step2);
+    void busy(verify, '確認中…', async () => {
+      const s = session;
+      if (!s) return;
+      let raw: Uint8Array<ArrayBuffer>;
+      try {
+        raw = await unwrapDek(s.file, pw.value);
+      } catch (e) {
+        if (!(e instanceof WrongPasswordError)) throw e;
+        err.textContent = 'マスターパスワードが違います。';
+        return;
+      }
+      pw.value = '';
+      pendingSecrets.add(raw);
+      // Face ID の登録画面はユーザー操作の直後にしか開けないので、もう一度ボタンを押してもらう
+      const enroll = button('Face ID を登録する', () => {
+        suppressLock++;
+        const done = enrollBio(raw);
+        void busy(enroll, '登録中…', async () => {
+          try {
+            const rec = await done;
+            await saveBio(rec);
+            if (session === s) show(settingsScreen());
+            toast('Face ID を有効にしました');
+          } catch (e) {
+            if (e instanceof BioCancelledError) err.textContent = '登録がキャンセルされました。';
+            else if (e instanceof BioUnavailableError) err.textContent = e.message;
+            else throw e;
+          } finally {
+            suppressLock--;
+            wipe(raw);
+            pendingSecrets.delete(raw);
+          }
+        });
+      }, 'primary');
+      step2.append(enroll);
+    });
+  });
+
+  return screen(
+    'Face ID を有効にする',
+    [button('戻る', () => { show(settingsScreen()); })],
+    h('ul', { class: 'notes' },
+      h('li', null, 'iCloud キーチェーンに「PassVault」のパスキーを作り、Face ID が通ったときだけ開けるようにします。'),
+      h('li', null, h('strong', null, 'iOS の仕様で、Face ID に失敗すると iPhone のパスコードでも開けます。'), 'パスコードを他人に知られないようにしてください。'),
+      h('li', null, 'この設定はこの端末だけのものです。バックアップには含まれず、バックアップは今まで通りマスターパスワードで開きます。'),
+      h('li', null, 'Face ID が使えないときは、いつでもマスターパスワードで開けます。'),
+    ),
+    field('マスターパスワード（確認）', pw),
+    err,
+    verify,
+    step2,
   );
 }
 
@@ -882,9 +1085,10 @@ export function boot(el: HTMLElement): void {
     return;
   }
 
-  // アプリを離れたら即ロック（App スイッチャーに中身を残さない）
+  // アプリを離れたらロック（App スイッチャーに中身を残さない）
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && session) lock();
+    if (document.hidden) onHidden();
+    else onVisible();
   });
   window.addEventListener('pagehide', () => {
     if (session) lock();

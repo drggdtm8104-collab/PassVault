@@ -85,13 +85,13 @@ function wrapAad(kdf: KdfParams): Uint8Array<ArrayBuffer> {
 
 const DATA_AAD = utf8(`${FORMAT}/data/v${VERSION}`);
 
-async function seal(key: CryptoKey, plain: Uint8Array<ArrayBuffer>, aad: Uint8Array<ArrayBuffer>): Promise<Sealed> {
+export async function seal(key: CryptoKey, plain: Uint8Array<ArrayBuffer>, aad: Uint8Array<ArrayBuffer>): Promise<Sealed> {
   const iv = randomBytes(12);
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, plain);
   return { iv: toB64(iv), ct: toB64(new Uint8Array(ct)) };
 }
 
-async function open(key: CryptoKey, s: Sealed, aad: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+export async function open(key: CryptoKey, s: Sealed, aad: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   try {
     const pt = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: fromB64(s.iv), additionalData: aad },
@@ -115,7 +115,7 @@ async function wrapDek(password: string, rawDek: Uint8Array<ArrayBuffer>): Promi
 }
 
 /** パスワードから DEK の生バイトを取り出す。呼び出し側で必ず wipe すること */
-async function unwrapDek(file: VaultFile, password: string): Promise<Uint8Array<ArrayBuffer>> {
+export async function unwrapDek(file: VaultFile, password: string): Promise<Uint8Array<ArrayBuffer>> {
   const kek = await deriveKek(password, file.kdf);
   const raw = await open(kek, file.wrap, wrapAad(file.kdf));
   if (raw.length !== 32) throw new InvalidFileError('bad key length');
@@ -137,12 +137,18 @@ export async function createVault<T>(password: string, payload: T): Promise<{ fi
 export async function unlockVault<T>(file: VaultFile, password: string): Promise<Unlocked<T>> {
   const rawDek = await unwrapDek(file, password);
   try {
-    const dek = await importDek(rawDek);
-    const payload = JSON.parse(fromUtf8(await open(dek, file.data, DATA_AAD))) as T;
-    return { dek, payload };
+    return await unlockWithRawDek<T>(file, rawDek);
   } finally {
     wipe(rawDek);
   }
+}
+
+/** DEK の生バイトで中身を復号する（Face ID 解除用）。rawDek の消去は呼び出し側が行う */
+export async function unlockWithRawDek<T>(file: VaultFile, rawDek: Uint8Array<ArrayBuffer>): Promise<Unlocked<T>> {
+  if (rawDek.length !== 32) throw new InvalidFileError('bad key length');
+  const dek = await importDek(rawDek);
+  const payload = JSON.parse(fromUtf8(await open(dek, file.data, DATA_AAD))) as T;
+  return { dek, payload };
 }
 
 /** 中身を新しい IV で暗号化し直した金庫ファイルを返す（鍵まわりはそのまま） */

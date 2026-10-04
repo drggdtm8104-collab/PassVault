@@ -164,3 +164,5 @@ details.trouble summary { color: var(--muted); cursor: pointer; padding: 8px 0; 
   transition: opacity 0.2s, transform 0.2s;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.cover { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 600; }

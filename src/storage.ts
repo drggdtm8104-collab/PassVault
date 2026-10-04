@@ -1,10 +1,13 @@
 // 端末内の保存（IndexedDB）。保存するのは暗号化済みの金庫ファイルだけ。
 
+import type { BioRecord } from './biometric.ts';
 import type { VaultFile } from './vault.ts';
 
 const DB = 'passvault';
 const STORE = 'kv';
 const KEY = 'vault';
+/** Face ID 用に包んだ DEK。この端末だけのもので、バックアップには含めない */
+const BIO_KEY = 'bio';
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -38,8 +41,22 @@ export async function saveVault(file: VaultFile): Promise<void> {
   await run('readwrite', (s) => s.put(file, KEY));
 }
 
+/** 金庫を削除する。DEK が変わる・無くなるので Face ID の記録も一緒に消す */
 export async function deleteVault(): Promise<void> {
   await run('readwrite', (s) => s.delete(KEY));
+  await deleteBio();
+}
+
+export async function loadBio(): Promise<BioRecord | null> {
+  return (await run<BioRecord | undefined>('readonly', (s) => s.get(BIO_KEY))) ?? null;
+}
+
+export async function saveBio(rec: BioRecord): Promise<void> {
+  await run('readwrite', (s) => s.put(rec, BIO_KEY));
+}
+
+export async function deleteBio(): Promise<void> {
+  await run('readwrite', (s) => s.delete(BIO_KEY));
 }
 
 /** ブラウザに「この保存領域を勝手に消さないで」と依頼する */

@@ -180,6 +180,92 @@ const otherStored = await other.page.evaluate(() => new Promise((res) => {
 assert.equal(otherStored, null, '閲覧モードでは保存しない');
 step('別端末でバックアップを閲覧でき、閲覧モードでは何も保存しない');
 
+// アプリを離れたときの猶予
+const setHidden = (p, hidden) => p.evaluate((hidden) => {
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+  document.dispatchEvent(new Event('visibilitychange'));
+  delete document.hidden;
+}, hidden);
+await btn(page, '設定').click();
+await page.getByLabel('アプリを離れたとき').selectOption('60');
+await page.getByText('変更しました').waitFor();
+await btn(page, '一覧').click();
+await page.getByText('Example <script>', { exact: false }).first().click();
+await btn(page, '表示').click();
+await page.getByText(SECRET).waitFor();
+await setHidden(page, true);
+assert.equal(await page.getByText(SECRET).count(), 0, '離れている間は中身を隠す');
+await shot(page, '09-cover');
+await setHidden(page, false);
+await page.getByText(SECRET).waitFor();
+step('猶予 1 分：離れている間は隠し、戻ると解除なしで続きから使える');
+await btn(page, '一覧').click();
+await btn(page, '設定').click();
+await page.getByLabel('アプリを離れたとき').selectOption('0');
+await page.getByText('変更しました').waitFor();
+await btn(page, '一覧').click();
+
+// Face ID（PRF 対応の仮想認証器で代用）
+const cdp = await ctx.newCDPSession(page);
+await cdp.send('WebAuthn.enable');
+const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+  options: {
+    protocol: 'ctap2',
+    transport: 'internal',
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+    hasPrf: true,
+    automaticPresenceSimulation: true,
+  },
+});
+await btn(page, '設定').click();
+await btn(page, 'Face ID を有効にする').click();
+await page.getByLabel('マスターパスワード（確認）').fill('wrong');
+await btn(page, '確認する').click();
+await page.getByText('マスターパスワードが違います').waitFor();
+await page.getByLabel('マスターパスワード（確認）').fill(NEW);
+await btn(page, '確認する').click();
+await btn(page, 'Face ID を登録する').click();
+await page.getByText('有効です', { exact: false }).waitFor();
+await shot(page, '10-faceid-settings');
+const bioStored = await page.evaluate(() => new Promise((res) => {
+  const r = indexedDB.open('passvault');
+  r.onsuccess = () => {
+    const g = r.result.transaction('kv').objectStore('kv').get('bio');
+    g.onsuccess = () => res(g.result ?? null);
+  };
+}));
+assert.ok(bioStored && bioStored.credId && bioStored.wrap.ct, 'Face ID 用の包んだ鍵が保存される');
+step('マスターパスワードの確認後に Face ID を登録できる');
+
+await btn(page, '一覧').click();
+// 今の一覧に印を付け、ロック → Face ID 解除で「新しい一覧」が描かれることを確認する
+await page.evaluate(() => { document.querySelector('.list').dataset.old = '1'; });
+await btn(page, 'ロック').click();
+await page.locator('.list:not([data-old])').waitFor();
+await page.getByText('Example <script>', { exact: false }).waitFor();
+step('ロック画面で自動的に Face ID が求められ、通れば開く');
+
+// Face ID が失敗したらマスターパスワードで開ける
+await cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: false });
+await btn(page, 'ロック').click();
+await btn(page, 'Face ID で開く').waitFor();
+await shot(page, '11-faceid-unlock');
+await btn(page, 'Face ID で開く').click();
+await page.getByText('Face ID で開けませんでした', { exact: false }).waitFor();
+await page.getByLabel('またはマスターパスワードで開く').fill(NEW);
+await btn(page, '開く').click();
+await page.getByText('Example <script>', { exact: false }).waitFor();
+step('Face ID に失敗したときはマスターパスワードで開ける');
+
+// 無効化
+await btn(page, '設定').click();
+await btn(page, 'Face ID を無効にする').click();
+await btn(page, 'Face ID を有効にする').waitFor();
+await btn(page, '一覧').click();
+step('Face ID を無効にできる');
+
 // 連続失敗で待ち時間
 await btn(page, 'ロック').click();
 for (let i = 0; i < 5; i++) {
