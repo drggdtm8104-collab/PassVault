@@ -1,0 +1,11 @@
+node_modules/
+*.log
+.DS_Store
+# 平文の書き出しやバックアップを誤ってコミットしないように
+passvault-*.json
+passvault-*.txt
+passvault-*.csv
+# 秘密情報を誤って公開しないように
+github-recovery-codes*.txt
+*recovery-codes*
+.claude/
