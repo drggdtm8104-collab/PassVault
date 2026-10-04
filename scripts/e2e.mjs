@@ -127,6 +127,41 @@ await page.getByText('見つかりません').waitFor();
 await search.fill('');
 step('検索：全角・登録メール・複数語で見つかり、無ければ「見つかりません」');
 
+// 種類：Wi-Fi と銀行・カードを登録し、種類で絞り込む
+await btn(page, '追加').click();
+await btn(page, 'Wi-Fi').click();
+assert.equal(await page.getByLabel('URL').count(), 0, 'Wi-Fi に URL 欄は無い');
+await page.getByLabel('名前', { exact: true }).fill('自宅の Wi-Fi');
+await page.getByLabel('ネットワーク名（SSID）').fill('MyHomeNet');
+await page.getByLabel('パスワード', { exact: true }).fill('wifi-pass-123');
+await shot(page, '15-edit-wifi');
+await btn(page, '保存').click();
+await page.getByText('MyHomeNet').waitFor();
+await btn(page, '一覧').click();
+
+await btn(page, '追加').click();
+await btn(page, '銀行・カード').click();
+await page.getByLabel('名前', { exact: true }).fill('楽天銀行');
+await page.getByLabel('口座番号・カード番号').fill('普通 1234567');
+await page.getByLabel('暗証番号').fill('4321');
+await btn(page, '保存').click();
+await page.getByText('普通 1234567').waitFor();
+assert.equal(await page.getByText('4321').count(), 0, '暗証番号は最初は伏せ字');
+await page.getByRole('button', { name: '表示' }).first().click();
+await page.getByText('4321').waitFor();
+await shot(page, '16-detail-bank');
+await btn(page, '一覧').click();
+
+await page.getByRole('button', { name: /^Wi-Fi 1$/ }).click();
+await page.getByText('自宅の Wi-Fi').waitFor();
+assert.equal(await page.getByText('楽天銀行').count(), 0);
+assert.equal(await page.getByText('Example <script>', { exact: false }).count(), 0);
+await shot(page, '17-filter-wifi');
+await page.getByRole('button', { name: /^すべて 3$/ }).click();
+await page.getByText('楽天銀行').waitFor();
+await page.getByText('Example <script>', { exact: false }).first().waitFor();
+step('種類ごとの入力欄（Wi-Fi・銀行）、暗証番号の伏せ字、種類での絞り込み');
+
 // 暗号化バックアップ
 await btn(page, '設定').click();
 const [dl] = await Promise.all([page.waitForEvent('download'), btn(page, '暗号化バックアップを保存').click()]);

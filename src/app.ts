@@ -3,6 +3,7 @@
 import { BioCancelledError, BioUnavailableError, bioAvailable, enrollBio, unlockBio, type BioRecord } from './biometric.ts';
 import { wipe } from './bytes.ts';
 import { clear, h } from './dom.ts';
+import { clearUnusedFields, KIND_IDS, KINDS, kindDef, subtitle, type FieldDef, type FieldKey, type Kind } from './kinds.ts';
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
@@ -265,6 +266,7 @@ function lock(message?: string): void {
   const wasReadOnly = session?.readOnly;
   session = null;
   parked = null;
+  listFilter = 'all';
   clearTimeout(idleTimer);
   clearClipboardIfDue(true);
   for (const b of pendingSecrets) wipe(b);
@@ -596,15 +598,36 @@ function needsBackup(p: Payload): boolean {
   return p.modifiedAt > p.lastBackupAt && Date.now() - p.lastBackupAt > 7 * 24 * 3600_000;
 }
 
+/** 一覧の種類での絞り込み（ロックするまで覚えておく） */
+let listFilter: Kind | 'all' = 'all';
+
+function chip(label: string, pressed: boolean, onClick: () => void): HTMLButtonElement {
+  return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), on: { click: onClick } }, label);
+}
+
 function listScreen(query = ''): HTMLElement {
   const s = session!;
   const search = textInput(query, { type: 'search', placeholder: '検索（名前・ID・メール・メモ）' });
+  const chips = h('div', { class: 'chips', role: 'group', 'aria-label': '種類で絞り込み' });
   const list = h('ul', { class: 'list' });
+
+  const renderChips = () => {
+    const count = (k: Kind | 'all') => (k === 'all' ? s.payload.entries : s.payload.entries.filter((e) => e.kind === k)).length;
+    clear(chips);
+    for (const k of ['all', ...KIND_IDS] as const) {
+      const label = k === 'all' ? 'すべて' : kindDef(k).label;
+      chips.append(chip(`${label} ${count(k)}`, listFilter === k, () => {
+        listFilter = k;
+        renderChips();
+        render();
+      }));
+    }
+  };
 
   const render = () => {
     const terms = parseQuery(search.value);
     const items = s.payload.entries
-      .filter((e) => matchesQuery(e, terms))
+      .filter((e) => (listFilter === 'all' || e.kind === listFilter) && matchesQuery(e, terms))
       .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     clear(list);
     if (items.length === 0) {
@@ -613,18 +636,26 @@ function listScreen(query = ''): HTMLElement {
     for (const e of items) {
       list.append(h('li', null,
         h('button', { type: 'button', class: 'item', on: { click: () => show(detailScreen(e.id)) } },
-          h('span', { class: 'title' }, e.title || '（名前なし）'),
-          h('span', { class: 'sub' }, e.username),
+          h('span', { class: 'title' },
+            e.title || '（名前なし）',
+            listFilter === 'all' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
+          ),
+          h('span', { class: 'sub' }, subtitle(e)),
         ),
       ));
     }
   };
   search.addEventListener('input', render);
+  renderChips();
   render();
 
   const actions = s.readOnly
     ? [button('終了', () => lock())]
-    : [button('追加', () => show(editScreen(null)), 'primary small'), button('設定', () => show(settingsScreen()), 'small'), button('ロック', () => lock(), 'small')];
+    : [
+        button('追加', () => show(editScreen(null, listFilter === 'all' ? 'login' : listFilter)), 'primary small'),
+        button('設定', () => show(settingsScreen()), 'small'),
+        button('ロック', () => lock(), 'small'),
+      ];
 
   return screen(
     'PassVault',
@@ -636,6 +667,7 @@ function listScreen(query = ''): HTMLElement {
         )
       : null,
     search,
+    chips,
     list,
   );
 }
@@ -658,32 +690,41 @@ function detailScreen(id: string): HTMLElement {
   const e = findEntry(id);
   if (!e) return listScreen();
   const ro = session!.readOnly;
+  const def = kindDef(e.kind);
 
-  const pwText = h('span', { class: 'mono masked' }, '••••••••');
-  let revealed = false;
-  const revealBtn = button('表示', () => {
-    revealed = !revealed;
-    pwText.textContent = revealed ? e.password : '••••••••';
-    pwText.classList.toggle('masked', !revealed);
-    revealBtn.textContent = revealed ? '隠す' : '表示';
-  }, 'small');
-
-  const url = safeUrl(e.url);
   const row = (label: string, value: Node, ...btns: (Node | string)[]) =>
     h('div', { class: 'detail-row' }, h('div', { class: 'label' }, label), h('div', { class: 'value' }, value), h('div', { class: 'btns' }, ...btns));
+
+  const secretRow = (f: FieldDef, v: string) => {
+    const multiline = f.input === 'textarea';
+    const text = h('span', { class: 'mono masked' }, '••••••••');
+    let revealed = false;
+    const toggle = button('表示', () => {
+      revealed = !revealed;
+      text.textContent = revealed ? v : '••••••••';
+      text.className = revealed ? (multiline ? 'note' : 'mono') : 'mono masked';
+      toggle.textContent = revealed ? '隠す' : '表示';
+    }, 'small');
+    return row(f.label, text, toggle, button('コピー', () => void copyText(v, f.label), 'small'));
+  };
+
+  const rows = def.fields.map((f) => {
+    const v = e[f.key];
+    if (!v) return null; // 未入力の欄は出さない
+    if (f.key === 'url') {
+      const u = safeUrl(v);
+      return row(f.label, h('span', { class: 'mono' }, v), u ? button('開く', () => window.open(u, '_blank', 'noopener,noreferrer'), 'small') : '');
+    }
+    if (f.secret) return secretRow(f, v);
+    if (f.input === 'textarea') return row(f.label, h('span', { class: 'note' }, v));
+    return row(f.label, h('span', { class: f.mono ? 'mono' : '' }, v), button('コピー', () => void copyText(v, f.label), 'small'));
+  });
 
   return screen(
     e.title || '（名前なし）',
     [button('一覧', () => show(listScreen())), ro ? null : button('編集', () => show(editScreen(e.id)), 'small')].filter(Boolean) as Node[],
-    h('div', { class: 'card' },
-      row('ログイン ID', h('span', { class: 'mono' }, e.username || '—'), e.username ? button('コピー', () => void copyText(e.username, 'ログイン ID'), 'small') : ''),
-      row('パスワード', pwText, revealBtn, e.password ? button('コピー', () => void copyText(e.password, 'パスワード'), 'small') : ''),
-      e.email ? row('登録メール', h('span', { class: 'mono' }, e.email), button('コピー', () => void copyText(e.email, 'メールアドレス'), 'small')) : null,
-      e.displayName ? row('ユーザー名', h('span', null, e.displayName), button('コピー', () => void copyText(e.displayName, 'ユーザー名'), 'small')) : null,
-      e.url ? row('URL', h('span', { class: 'mono' }, e.url), url ? button('開く', () => window.open(url, '_blank', 'noopener,noreferrer'), 'small') : '') : null,
-      e.note ? row('メモ', h('span', { class: 'note' }, e.note)) : null,
-    ),
-    h('p', { class: 'muted' }, `更新：${formatDate(e.updatedAt)}`),
+    rows.some(Boolean) ? h('div', { class: 'card' }, ...rows) : h('p', { class: 'muted' }, '名前以外は未入力です。'),
+    h('p', { class: 'muted' }, `種類：${def.label}　更新：${formatDate(e.updatedAt)}`),
     ro ? null : button('削除', () => {
       if (!confirm(`「${e.title}」を削除します。よろしいですか？`)) return;
       void commit((p) => { p.entries = p.entries.filter((x) => x.id !== e.id); }).then(() => {
@@ -729,8 +770,11 @@ function generatorPanel(onUse: (pw: string) => void): HTMLElement {
   );
 }
 
+
+type FieldInput = HTMLInputElement | HTMLTextAreaElement;
+
 /** 値があるときだけ欄を出し、無いときは「＋ ラベル」ボタンにしておく */
-function optionalField(label: string, input: HTMLInputElement, hint: string): HTMLElement {
+function optionalField(label: string, input: FieldInput, hint?: string): HTMLElement {
   const wrap = h('div', { class: 'add-slot' });
   const reveal = () => {
     wrap.classList.add('full');
@@ -741,30 +785,71 @@ function optionalField(label: string, input: HTMLInputElement, hint: string): HT
   return wrap;
 }
 
-function editScreen(id: string | null): HTMLElement {
-  const e = id ? findEntry(id) : undefined;
-  const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: '例：Amazon、Gmail（仕事用）、自宅の Wi-Fi' });
-  const username = textInput(e?.username ?? '', { placeholder: 'メールアドレス、ユーザー名、会員番号など' });
-  const email = textInput(e?.email ?? '', { type: 'email', placeholder: 'me@example.com' });
-  const displayName = textInput(e?.displayName ?? '', { placeholder: 'ニックネームや表示名' });
-  const password = secretInput({ autocomplete: 'new-password' });
-  password.value = e?.password ?? '';
-  const url = textInput(e?.url ?? '', { type: 'url', placeholder: 'https://' });
-  const note = h('textarea', { rows: 4, autocapitalize: 'none', autocorrect: 'off', spellcheck: false, value: e?.note ?? '' });
-  const err = h('p', { class: 'error', role: 'alert' });
-  const genSlot = h('div');
+const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'number', 'pin', 'server', 'url', 'note'];
 
-  const genBtn = button('生成', () => {
-    if (genSlot.firstChild) {
-      clear(genSlot);
-      return;
+function editScreen(id: string | null, defaultKind: Kind = 'login'): HTMLElement {
+  const e = id ? findEntry(id) : undefined;
+  let kind: Kind = e?.kind ?? defaultKind;
+  const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: kindDef(kind).titlePlaceholder });
+  // 種類を切り替えても入力途中の値を失わないよう、値は欄の外で持つ
+  const values = Object.fromEntries(ALL_FIELD_KEYS.map((k) => [k, e?.[k] ?? ''])) as Record<FieldKey, string>;
+  const kindChips = h('div', { class: 'chips', role: 'group', 'aria-label': '種類' });
+  const fieldsBox = h('div', { class: 'stack fields' });
+  const err = h('p', { class: 'error', role: 'alert' });
+
+  const makeInput = (f: FieldDef): FieldInput => {
+    let el: FieldInput;
+    if (f.input === 'textarea') {
+      el = h('textarea', { rows: 4, autocapitalize: 'none', autocorrect: 'off', spellcheck: false });
+    } else if (f.secret) {
+      el = secretInput({ autocomplete: f.generate ? 'new-password' : 'off' });
+    } else {
+      el = textInput('', { type: f.input === 'email' ? 'email' : f.input === 'url' ? 'url' : 'text', placeholder: f.placeholder });
     }
-    genSlot.append(generatorPanel((pw) => {
-      password.value = pw;
-      password.type = 'text';
-      clear(genSlot);
-    }));
-  }, 'small');
+    if (f.numeric) el.inputMode = 'numeric';
+    el.value = values[f.key];
+    el.addEventListener('input', () => { values[f.key] = el.value; });
+    return el;
+  };
+
+  const renderFields = () => {
+    const def = kindDef(kind);
+    title.placeholder = def.titlePlaceholder;
+    clear(kindChips);
+    for (const k of KINDS) kindChips.append(chip(k.label, k.id === kind, () => { kind = k.id; renderFields(); }));
+
+    clear(fieldsBox);
+    let adds: HTMLElement | null = null;
+    for (const f of def.fields) {
+      const input = makeInput(f);
+      if (f.optional) {
+        if (!adds) fieldsBox.append((adds = h('div', { class: 'adds' })));
+        adds.append(optionalField(f.label, input, f.hint));
+        continue;
+      }
+      if (f.secret && input instanceof HTMLInputElement) {
+        const genSlot = h('div');
+        const controls: Node[] = [withRevealToggle(input)];
+        if (f.generate) {
+          controls.push(button('生成', () => {
+            if (genSlot.firstChild) {
+              clear(genSlot);
+              return;
+            }
+            genSlot.append(generatorPanel((pw) => {
+              input.value = values[f.key] = pw;
+              input.type = 'text';
+              clear(genSlot);
+            }));
+          }, 'small'));
+        }
+        fieldsBox.append(field(f.label, h('div', { class: 'row' }, ...controls), f.hint), genSlot);
+      } else {
+        fieldsBox.append(field(f.label, input, f.hint));
+      }
+    }
+  };
+  renderFields();
 
   const save = button('保存', () => {
     err.textContent = '';
@@ -772,20 +857,25 @@ function editScreen(id: string | null): HTMLElement {
       err.textContent = '名前を入力してください。';
       return;
     }
+    const def = kindDef(kind);
+    const used = new Set(def.fields.map((f) => f.key));
+    const lost = ALL_FIELD_KEYS.filter((k) => !used.has(k) && values[k]);
+    if (e && lost.length > 0 && !confirm(`種類を「${def.label}」にすると、使わない欄の内容は削除されます。よろしいですか？`)) return;
     void busy(save, '保存中…', async () => {
       const now = Date.now();
-      const entry: Entry = {
+      // ID や番号は前後の空白を除く。パスワード・暗証番号・複数行の欄はそのまま保存する
+      const clean = (k: FieldKey) => {
+        const f = def.fields.find((x) => x.key === k);
+        return f && !f.secret && f.input !== 'textarea' ? values[k].trim() : values[k];
+      };
+      const entry = clearUnusedFields({
         id: e?.id ?? crypto.randomUUID(),
+        kind,
         title: title.value.trim(),
-        username: username.value.trim(),
-        email: email.value.trim(),
-        displayName: displayName.value.trim(),
-        password: password.value,
-        url: url.value.trim(),
-        note: note.value,
+        ...(Object.fromEntries(ALL_FIELD_KEYS.map((k) => [k, clean(k)])) as Record<FieldKey, string>),
         createdAt: e?.createdAt ?? now,
         updatedAt: now,
-      };
+      });
       await commit((p) => {
         const i = p.entries.findIndex((x) => x.id === entry.id);
         if (i >= 0) p.entries[i] = entry;
@@ -799,16 +889,9 @@ function editScreen(id: string | null): HTMLElement {
   return screen(
     e ? '編集' : '追加',
     [button('キャンセル', () => show(e ? detailScreen(e.id) : listScreen()))],
+    field('種類', kindChips),
     field('名前', title, '同じサービスが複数あるときは「X（仕事用）」のように区別すると探しやすくなります'),
-    field('ログイン ID', username, 'ログイン画面で入力するもの'),
-    field('パスワード', h('div', { class: 'row' }, withRevealToggle(password), genBtn)),
-    genSlot,
-    h('div', { class: 'adds' },
-      optionalField('登録メールアドレス', email, 'ログイン ID と別のときだけ'),
-      optionalField('ユーザー名', displayName, 'ログインに使わない表示名など'),
-    ),
-    field('URL', url),
-    field('メモ', note),
+    fieldsBox,
     err,
     save,
   );

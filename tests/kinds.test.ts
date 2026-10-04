@@ -1,0 +1,50 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { clearUnusedFields, KINDS, subtitle } from '../src/kinds.ts';
+import { toCsv, toText } from '../src/plaintext.ts';
+import type { Entry } from '../src/model.ts';
+
+function entry(p: Partial<Entry>): Entry {
+  return {
+    id: '1', kind: 'login', title: 'T', username: '', password: '', email: '', displayName: '',
+    number: '', pin: '', server: '', url: '', note: '', createdAt: 0, updatedAt: 0, ...p,
+  };
+}
+
+test('種類の定義：すべての種類に名前があり、欄の重複がない', () => {
+  for (const k of KINDS) {
+    assert.ok(k.label && k.fields.length > 0, k.id);
+    const keys = k.fields.map((f) => f.key);
+    assert.equal(new Set(keys).size, keys.length, k.id);
+  }
+});
+
+test('種類を変えたら、使わない欄は空にする', () => {
+  const e = clearUnusedFields(entry({ kind: 'wifi', username: 'MySSID', password: 'pw', email: 'a@b', url: 'https://x', pin: '1234' }));
+  assert.equal(e.username, 'MySSID');
+  assert.equal(e.password, 'pw');
+  assert.equal(e.email, '');
+  assert.equal(e.url, '');
+  assert.equal(e.pin, '');
+});
+
+test('一覧の 2 行目に秘密の欄を出さない', () => {
+  assert.equal(subtitle(entry({ kind: 'login', username: 'me' })), 'me');
+  assert.equal(subtitle(entry({ kind: 'note', note: '秘密' })), '');
+  assert.equal(subtitle(entry({ kind: 'bank', number: '1234', pin: '9999' })), '');
+});
+
+test('銀行・カードの平文書き出し：暗証番号・番号も含める', () => {
+  const e = entry({ kind: 'bank', title: '楽天銀行', number: '普通 1234567', pin: '4321', username: 'id1', password: 'pw1' });
+  const txt = toText([e], 0);
+  for (const s of ['種類: 銀行・カード', '口座番号・カード番号: 普通 1234567', '暗証番号: 4321', 'ネットバンキングのログイン ID: id1']) {
+    assert.ok(txt.includes(s), s);
+  }
+  const csv = toCsv([e]);
+  assert.ok(csv.includes('楽天銀行,,id1,pw1,"種類: 銀行・カード\n口座番号・カード番号: 普通 1234567\n暗証番号: 4321",'), csv);
+});
+
+test('メモの複数行は字下げして書き出す', () => {
+  const txt = toText([entry({ kind: 'note', title: 'コード', note: 'aaa\nbbb' })], 0);
+  assert.ok(txt.includes('内容:\n  aaa\n  bbb'));
+});

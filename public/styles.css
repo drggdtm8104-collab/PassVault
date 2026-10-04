@@ -168,3 +168,9 @@ details.trouble summary { color: var(--muted); cursor: pointer; padding: 8px 0; 
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 .cover { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 600; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
+.chip { min-height: 36px; padding: 4px 14px; border-radius: 999px; white-space: nowrap; font-size: 0.9rem; flex-shrink: 0; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.badge { display: inline-block; margin-left: 8px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; font-weight: 400; color: var(--muted); vertical-align: 2px; }
+.fields > * + * { margin-top: 0; }

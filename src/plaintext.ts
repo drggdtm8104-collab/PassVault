@@ -1,5 +1,6 @@
 // 平文での書き出し（非常用）。誰でも読めるファイルになるので、呼び出し側で再認証と警告を必ず行う。
 
+import { kindDef } from './kinds.ts';
 import type { Entry } from './model.ts';
 
 function formatDate(ms: number): string {
@@ -18,16 +19,20 @@ export function toText(entries: Entry[], now = Date.now()): string {
     '',
   ];
   for (const e of entries) {
+    const def = kindDef(e.kind);
     lines.push('----------------------------------------');
     lines.push(`名前: ${e.title}`);
-    if (e.url) lines.push(`URL: ${e.url}`);
-    lines.push(`ログインID: ${e.username}`);
-    if (e.email) lines.push(`登録メール: ${e.email}`);
-    if (e.displayName) lines.push(`ユーザー名: ${e.displayName}`);
-    lines.push(`パスワード: ${e.password}`);
-    if (e.note) {
-      lines.push('メモ:');
-      for (const l of e.note.split(/\r?\n/)) lines.push(`  ${l}`);
+    lines.push(`種類: ${def.label}`);
+    for (const f of def.fields) {
+      const v = e[f.key];
+      // 空の任意項目は出さない。必須の欄は空でも見出しを出す（書き漏れに気づけるように）
+      if (!v && (f.optional || f.input === 'textarea' || f.key === 'url')) continue;
+      if (v.includes('\n')) {
+        lines.push(`${f.label}:`);
+        for (const l of v.split(/\r?\n/)) lines.push(`  ${l}`);
+      } else {
+        lines.push(`${f.label}: ${v}`);
+      }
     }
   }
   lines.push('----------------------------------------');
@@ -40,15 +45,17 @@ function csvField(v: string): string {
 
 /**
  * 乗り換え向けの CSV。列は iPhone の「パスワード」アプリの取り込み形式に合わせる。
+ * 専用の列が無い欄（登録メール・暗証番号など）は Notes 列に「見出し: 値」で追記する。
  * パスワードを書き換えないよう、表計算ソフト向けの「=」等の無害化はしない。
  */
 export function toCsv(entries: Entry[]): string {
   const rows = [['Title', 'URL', 'Username', 'Password', 'Notes', 'OTPAuth']];
   for (const e of entries) {
-    // 取り込み先に専用の列が無いので、登録メールとユーザー名はメモに追記する
-    const notes = [e.note, e.email && `登録メール: ${e.email}`, e.displayName && `ユーザー名: ${e.displayName}`]
-      .filter(Boolean)
-      .join('\n');
+    const def = kindDef(e.kind);
+    const extra = def.fields
+      .filter((f) => !['username', 'password', 'url', 'note'].includes(f.key) && e[f.key])
+      .map((f) => `${f.label}: ${e[f.key]}`);
+    const notes = [e.note, e.kind !== 'login' && `種類: ${def.label}`, ...extra].filter(Boolean).join('\n');
     rows.push([e.title, e.url, e.username, e.password, notes, '']);
   }
   return rows.map((r) => r.map(csvField).join(',')).join('\r\n') + '\r\n';

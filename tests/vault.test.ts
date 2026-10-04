@@ -23,10 +23,14 @@ function samplePayload(): Payload {
   p.modifiedAt = 1000;
   p.entries.push({
     id: 'a',
+    kind: 'login',
     title: 'Example',
     username: 'me@example.com',
     email: '',
     displayName: '',
+    number: '',
+    pin: '',
+    server: '',
     password: 'p@ss"word,\n改行',
     url: 'https://example.com',
     note: 'メモ',
@@ -140,6 +144,8 @@ test('不正なファイルや極端な鍵設定を読み込み前に拒否す�
 test('復号した中身の欠けや型違いを補正する', () => {
   const p = normalizePayload({ entries: [{ title: 5, password: 'x' }], settings: { autoLockMinutes: 999 } });
   assert.equal(p.entries[0].title, '');
+  assert.equal(p.entries[0].kind, 'login', '種類の無い古いデータはログイン扱い');
+  assert.equal(p.entries[0].pin, '');
   assert.equal(p.entries[0].password, 'x');
   assert.ok(p.entries[0].id);
   assert.equal(p.settings.autoLockMinutes, 3);

@@ -4,7 +4,7 @@ import { matchesQuery, normalizeForSearch, parseQuery } from '../src/search.ts';
 import type { Entry } from '../src/model.ts';
 
 function entry(p: Partial<Entry>): Entry {
-  return { id: '1', title: '', username: '', email: '', displayName: '', password: 'SECRET', url: '', note: '', createdAt: 0, updatedAt: 0, ...p };
+  return { id: '1', kind: 'login', title: '', number: '', pin: '', server: '', username: '', email: '', displayName: '', password: 'SECRET', url: '', note: '', createdAt: 0, updatedAt: 0, ...p };
 }
 
 const find = (e: Entry, q: string) => matchesQuery(e, parseQuery(q));
@@ -40,8 +40,10 @@ test('複数の語はすべて含むものだけ', () => {
   assert.ok(find(work, 'x　仕事'), '全角スペース区切りも可');
 });
 
-test('パスワードは検索対象にしない', () => {
+test('パスワードと暗証番号は検索対象にしない', () => {
   assert.ok(!find(entry({ title: 'A' }), 'secret'));
+  assert.ok(!find(entry({ title: 'A', kind: 'bank', pin: '4321' }), '4321'));
+  assert.ok(find(entry({ title: 'A', kind: 'bank', number: '普通 1234567' }), '1234567'));
 });
 
 test('欄の境目をまたいで一致しない', () => {

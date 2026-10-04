@@ -43,10 +43,14 @@ test('マスターパスワードの強さ判定', () => {
 const entries: Entry[] = [
   {
     id: '1',
+    kind: 'login',
     title: 'A, "B"',
     username: 'u',
     email: 'mail@example.com',
     displayName: '',
+    number: '',
+    pin: '',
+    server: '',
     password: '=1+2',
     url: 'https://a.example',
     note: '1行目\n2行目',
@@ -59,13 +63,13 @@ test('CSV は特殊文字を正しくエスケープし、値を書き換えな�
   const csv = toCsv(entries);
   assert.equal(
     csv,
-    'Title,URL,Username,Password,Notes,OTPAuth\r\n"A, ""B""",https://a.example,u,=1+2,"1行目\n2行目\n登録メール: mail@example.com",\r\n',
+    'Title,URL,Username,Password,Notes,OTPAuth\r\n"A, ""B""",https://a.example,u,=1+2,"1行目\n2行目\n登録メールアドレス: mail@example.com",\r\n',
   );
 });
 
 test('テキスト書き出しに全項目が含まれる', () => {
   const txt = toText(entries, 0);
-  for (const s of ['名前: A, "B"', 'https://a.example', 'ログインID: u', '登録メール: mail@example.com', 'パスワード: =1+2', '  2行目', '件数: 1']) {
+  for (const s of ['名前: A, "B"', 'https://a.example', '種類: ログイン', 'ログイン ID: u', '登録メールアドレス: mail@example.com', 'パスワード: =1+2', '  2行目', '件数: 1']) {
     assert.ok(!txt.includes('ユーザー名:'), '空の項目は出さない');
     assert.ok(txt.includes(s), s);
   }

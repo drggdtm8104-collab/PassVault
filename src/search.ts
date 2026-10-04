@@ -16,7 +16,8 @@ export function normalizeForSearch(s: string): string {
 
 function haystack(e: Entry): string {
   // 欄の境目をまたいで一致しないよう、正規化で消えない区切りを入れる
-  return [e.title, e.username, e.email, e.displayName, e.url, e.note].map(normalizeForSearch).join('\u0000');
+  // パスワードと暗証番号は対象にしない（一部を打つと候補が出て推測の手がかりになるため）
+  return [e.title, e.username, e.email, e.displayName, e.number, e.server, e.url, e.note].map(normalizeForSearch).join('\u0000');
 }
 
 /** 検索語を語ごとに分けて正規化する（空になった語は捨てる） */
