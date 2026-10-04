@@ -4,7 +4,7 @@ import { chromium } from 'playwright-core';
 import { readFileSync, mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const BASE = 'http://localhost:8080/';
+const BASE = process.env.BASE_URL ?? 'http://localhost:8080/';
 const shots = process.argv[2];
 if (shots) mkdirSync(shots, { recursive: true });
 const MASTER = 'みかん-電車-雲-えんぴつ-28';
