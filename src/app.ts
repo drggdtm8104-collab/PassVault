@@ -606,28 +606,22 @@ function inFilter(e: Entry, f: ListFilter): boolean {
   return f === 'all' || (f === 'fav' ? e.favorite : e.kind === f);
 }
 
-function chip(label: string, pressed: boolean, onClick: () => void): HTMLButtonElement {
-  return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), on: { click: onClick } }, label);
-}
-
 function listScreen(query = ''): HTMLElement {
   const s = session!;
   const search = textInput(query, { type: 'search', placeholder: '検索（名前・ID・メール・メモ）' });
-  const chips = h('div', { class: 'chips', role: 'group', 'aria-label': '種類で絞り込み' });
-  const list = h('ul', { class: 'list' });
-
-  const renderChips = () => {
-    const count = (k: ListFilter) => s.payload.entries.filter((e) => inFilter(e, k)).length;
-    clear(chips);
-    for (const k of ['all', 'fav', ...KIND_IDS] as const) {
+  // 絞り込みはプルダウンメニュー（iPhone では画面下に選択肢が出る）
+  const count = (k: ListFilter) => s.payload.entries.filter((e) => inFilter(e, k)).length;
+  const filter = h('select', { class: 'filter' },
+    ...(['all', 'fav', ...KIND_IDS] as const).map((k) => {
       const label = k === 'all' ? 'すべて' : k === 'fav' ? '★ お気に入り' : kindDef(k).label;
-      chips.append(chip(`${label} ${count(k)}`, listFilter === k, () => {
-        listFilter = k;
-        renderChips();
-        render();
-      }));
-    }
-  };
+      return h('option', { value: k, selected: k === listFilter }, `${label}（${count(k)}）`);
+    }),
+  );
+  filter.addEventListener('change', () => {
+    listFilter = filter.value as ListFilter;
+    render();
+  });
+  const list = h('ul', { class: 'list' });
 
   const render = () => {
     const terms = parseQuery(search.value);
@@ -643,7 +637,8 @@ function listScreen(query = ''): HTMLElement {
         h('button', { type: 'button', class: 'item', on: { click: () => show(detailScreen(e.id)) } },
           h('span', { class: 'title' },
             e.favorite ? h('span', { class: 'star', 'aria-label': 'お気に入り' }, '★') : null,
-            e.title || '（名前なし）',
+            h('span', { class: 'name' }, e.title || '（名前なし）'),
+            // 種類は右端に固定（絞り込み中の種類と同じなら出さない）
             listFilter === 'all' || listFilter === 'fav' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
           ),
           h('span', { class: 'sub' }, subtitle(e)),
@@ -652,7 +647,6 @@ function listScreen(query = ''): HTMLElement {
     }
   };
   search.addEventListener('input', render);
-  renderChips();
   render();
 
   const actions = s.readOnly
@@ -673,7 +667,7 @@ function listScreen(query = ''): HTMLElement {
         )
       : null,
     search,
-    chips,
+    field('表示', filter),
     list,
   );
 }

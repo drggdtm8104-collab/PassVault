@@ -106,7 +106,7 @@ textarea { resize: vertical; }
 .check input { width: 20px; height: 20px; flex-shrink: 0; }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .hidden { display: none; }
-.star { color: #e0a100; margin-right: 4px; }
+.star { color: #e0a100; flex-shrink: 0; }
 button.fav { font-size: 1.1rem; min-width: 44px; }
 button.fav[aria-pressed="true"] { color: #e0a100; border-color: #e0a100; }
 .adds { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -124,7 +124,8 @@ button.fav[aria-pressed="true"] { color: #e0a100; border-color: #e0a100; }
 .list { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
 .list li + li { border-top: 1px solid var(--border); }
 .list .item { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: 0; border-radius: 0; background: none; padding: 10px 14px; text-align: left; }
-.list .title { font-weight: 600; }
+.list .title { font-weight: 600; display: flex; align-items: center; gap: 6px; width: 100%; }
+.list .title .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list .sub { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
 .list .empty { padding: 16px; color: var(--muted); }
 
@@ -172,10 +173,7 @@ details.trouble summary { color: var(--muted); cursor: pointer; padding: 8px 0; 
 
 .cover { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 600; }
 
-.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
-.chip { min-height: 36px; padding: 4px 14px; border-radius: 999px; white-space: nowrap; font-size: 0.9rem; flex-shrink: 0; }
-.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
-.badge { display: inline-block; margin-left: 8px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; font-weight: 400; color: var(--muted); vertical-align: 2px; }
+.badge { flex-shrink: 0; margin-left: auto; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
 .fields > * + * { margin-top: 0; }
 
 .tabs { display: flex; border-bottom: 1px solid var(--border); }

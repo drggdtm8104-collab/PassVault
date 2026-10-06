@@ -156,13 +156,22 @@ await page.getByText('4321').waitFor();
 await shot(page, '16-detail-bank');
 await btn(page, '一覧').click();
 
-await page.getByRole('button', { name: /^Wi-Fi 1$/ }).click();
+const filter = page.getByLabel('表示');
+assert.ok((await filter.locator('option[value="wifi"]').textContent()).includes('Wi-Fi（1）'), '件数が選択肢に出る');
+await filter.selectOption('wifi');
 await page.getByText('自宅の Wi-Fi').waitFor();
 assert.equal(await page.getByText('楽天銀行').count(), 0);
 assert.equal(await page.getByText('Example <script>', { exact: false }).count(), 0);
 await shot(page, '17-filter-wifi');
-await page.getByRole('button', { name: /^すべて 3$/ }).click();
+await filter.selectOption('all');
 await page.getByText('楽天銀行').waitFor();
+// 種類の表示は右端に固定
+const listBox = await page.locator('.list').boundingBox();
+for (const b of await page.locator('.list .badge').all()) {
+  const box = await b.boundingBox();
+  assert.ok(Math.abs(listBox.x + listBox.width - (box.x + box.width)) < 24, '種類の表示が右端にある');
+}
+await shot(page, '17b-list-all');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
 step('種類ごとの入力欄（Wi-Fi・銀行）、暗証番号の伏せ字、種類での絞り込み');
 
@@ -172,7 +181,7 @@ await page.getByRole('button', { name: 'お気に入りに追加' }).click();
 await page.getByText('お気に入りに追加しました').waitFor();
 assert.equal(await page.getByRole('button', { name: 'お気に入りから外す' }).count(), 1);
 await btn(page, '一覧').click();
-await page.getByRole('button', { name: /^★ お気に入り 1$/ }).click();
+await page.getByLabel('表示').selectOption('fav');
 await page.getByText('楽天銀行').waitFor();
 assert.equal(await page.getByText('自宅の Wi-Fi').count(), 0);
 await shot(page, '18-filter-fav');
@@ -180,8 +189,8 @@ await page.getByText('楽天銀行').click();
 await page.getByRole('button', { name: 'お気に入りから外す' }).click();
 await page.getByText('お気に入りから外しました').waitFor();
 await btn(page, '一覧').click();
-await page.getByRole('button', { name: /^★ お気に入り 0$/ }).waitFor();
-await page.getByRole('button', { name: /^すべて 3$/ }).click();
+assert.ok((await page.getByLabel('表示').locator('option[value="fav"]').textContent()).includes('お気に入り（0）'));
+await page.getByLabel('表示').selectOption('all');
 step('お気に入りの追加・解除、お気に入りでの絞り込み');
 
 // 暗号化バックアップ
