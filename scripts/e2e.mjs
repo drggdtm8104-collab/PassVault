@@ -131,14 +131,16 @@ await page.getByText('見つかりません').waitFor();
 await search.fill('');
 step('検索：全角・登録メール・複数語で見つかり、無ければ「見つかりません」');
 
-// 種類：Wi-Fi と銀行・カードを登録し、種類で絞り込む
+// 種類：その他と銀行・カードを登録し、種類で絞り込む
 await btn(page, '追加').click();
-await page.getByRole('tab', { name: 'Wi-Fi' }).click();
-assert.equal(await page.getByLabel('URL').count(), 0, 'Wi-Fi に URL 欄は無い');
+assert.equal(await page.getByRole('tab', { name: 'Wi-Fi' }).count(), 0, 'Wi-Fi の種類は無い');
+assert.equal(await page.getByRole('tab', { name: 'メモ' }).count(), 0, 'メモの種類は無い');
+await page.getByRole('tab', { name: 'その他' }).click();
+assert.equal(await page.getByLabel('暗証番号').count(), 0, 'その他に暗証番号欄は無い');
 await page.getByLabel('名前', { exact: true }).fill('自宅の Wi-Fi');
-await page.getByLabel('ネットワーク名（SSID）').fill('MyHomeNet');
+await page.getByLabel('ID', { exact: true }).fill('MyHomeNet');
 await page.getByLabel('パスワード', { exact: true }).fill('wifi-pass-123');
-await shot(page, '15-edit-wifi');
+await shot(page, '15-edit-other');
 await btn(page, '保存').click();
 await page.getByText('MyHomeNet').waitFor();
 await btn(page, '一覧').click();
@@ -157,23 +159,26 @@ await shot(page, '16-detail-bank');
 await btn(page, '一覧').click();
 
 const filter = page.getByLabel('表示');
-assert.ok((await filter.locator('option[value="wifi"]').textContent()).includes('Wi-Fi（1）'), '件数が選択肢に出る');
-await filter.selectOption('wifi');
+assert.ok((await filter.locator('option[value="other"]').textContent()).includes('その他（1）'), '件数が選択肢に出る');
+assert.equal(await filter.locator('option[value="wifi"]').count(), 0);
+await filter.selectOption('other');
 await page.getByText('自宅の Wi-Fi').waitFor();
 assert.equal(await page.getByText('楽天銀行').count(), 0);
 assert.equal(await page.getByText('Example <script>', { exact: false }).count(), 0);
-await shot(page, '17-filter-wifi');
+await shot(page, '17-filter-other');
 await filter.selectOption('all');
 await page.getByText('楽天銀行').waitFor();
 // 種類の表示は右端に固定
 const listBox = await page.locator('.list').boundingBox();
+const filterBox = await filter.boundingBox();
+assert.ok(listBox.y - (filterBox.y + filterBox.height) >= 12, 'プルダウンと一覧の間に隙間がある');
 for (const b of await page.locator('.list .badge').all()) {
   const box = await b.boundingBox();
   assert.ok(Math.abs(listBox.x + listBox.width - (box.x + box.width)) < 24, '種類の表示が右端にある');
 }
 await shot(page, '17b-list-all');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
-step('種類ごとの入力欄（Wi-Fi・銀行）、暗証番号の伏せ字、種類での絞り込み');
+step('種類ごとの入力欄（その他・銀行）、暗証番号の伏せ字、種類での絞り込み、プルダウンと一覧の隙間');
 
 // お気に入り
 await page.getByText('楽天銀行').click();

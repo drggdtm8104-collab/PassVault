@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clearUnusedFields, KINDS, subtitle } from '../src/kinds.ts';
+import { clearUnusedFields, KINDS, subtitle, toKind } from '../src/kinds.ts';
+import { normalizePayload } from '../src/model.ts';
 import { toCsv, toText } from '../src/plaintext.ts';
 import type { Entry } from '../src/model.ts';
 
@@ -20,17 +21,17 @@ test('種類の定義：すべての種類に名前があり、欄の重複が�
 });
 
 test('種類を変えたら、使わない欄は空にする', () => {
-  const e = clearUnusedFields(entry({ kind: 'wifi', username: 'MySSID', password: 'pw', email: 'a@b', url: 'https://x', pin: '1234' }));
+  const e = clearUnusedFields(entry({ kind: 'other', username: 'MySSID', password: 'pw', email: 'a@b', url: 'https://x', pin: '1234' }));
   assert.equal(e.username, 'MySSID');
   assert.equal(e.password, 'pw');
+  assert.equal(e.url, 'https://x');
   assert.equal(e.email, '');
-  assert.equal(e.url, '');
   assert.equal(e.pin, '');
 });
 
 test('一覧の 2 行目に秘密の欄を出さない', () => {
   assert.equal(subtitle(entry({ kind: 'login', username: 'me' })), 'me');
-  assert.equal(subtitle(entry({ kind: 'note', note: '秘密' })), '');
+  assert.equal(subtitle(entry({ kind: 'other', username: 'MySSID' })), 'MySSID');
   assert.equal(subtitle(entry({ kind: 'bank', number: '1234', pin: '9999' })), '');
 });
 
@@ -45,6 +46,19 @@ test('銀行・カードの平文書き出し：暗証番号・番号も含め�
 });
 
 test('メモの複数行は字下げして書き出す', () => {
-  const txt = toText([entry({ kind: 'note', title: 'コード', note: 'aaa\nbbb' })], 0);
-  assert.ok(txt.includes('内容:\n  aaa\n  bbb'));
+  const txt = toText([entry({ kind: 'other', title: 'コード', note: 'aaa\nbbb' })], 0);
+  assert.ok(txt.includes('メモ:\n  aaa\n  bbb'));
+});
+
+test('廃止した種類（Wi-Fi・メモ）は「その他」として読み込み、中身は残す', () => {
+  assert.equal(toKind('wifi'), 'other');
+  assert.equal(toKind('note'), 'other');
+  assert.equal(toKind('bank'), 'bank');
+  assert.equal(toKind(undefined), 'login');
+  assert.equal(toKind('unknown'), 'login');
+  const p = normalizePayload({ entries: [
+    { kind: 'wifi', title: '自宅', username: 'MySSID', password: 'pw' },
+    { kind: 'note', title: 'コード', note: 'aaa' },
+  ] });
+  assert.deepEqual(p.entries.map((e) => [e.kind, e.username, e.password, e.note]), [['other', 'MySSID', 'pw', ''], ['other', '', '', 'aaa']]);
 });

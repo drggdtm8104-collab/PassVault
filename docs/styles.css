@@ -121,7 +121,7 @@ button.fav[aria-pressed="true"] { color: #e0a100; border-color: #e0a100; }
 .notes { padding-left: 1.2em; margin: 0; }
 .notes li + li { margin-top: 4px; }
 
-.list { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.list { list-style: none; margin: 16px 0 0; padding: 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
 .list li + li { border-top: 1px solid var(--border); }
 .list .item { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: 0; border-radius: 0; background: none; padding: 10px 14px; text-align: left; }
 .list .title { font-weight: 600; display: flex; align-items: center; gap: 6px; width: 100%; }

@@ -1,10 +1,10 @@
 // 金庫の中身（暗号化される JSON）の型と、読み込み時の正規化。
 
-import { isKind, type Kind } from './kinds.ts';
+import { toKind, type Kind } from './kinds.ts';
 
 export interface Entry {
   id: string;
-  /** 種類（ログイン・メール・銀行カード・Wi-Fi・メモ）。種類によって使う欄が変わる（kinds.ts） */
+  /** 種類（ログイン・メール・銀行カード・その他）。種類によって使う欄が変わる（kinds.ts） */
   kind: Kind;
   title: string;
   /** お気に入り */
@@ -70,8 +70,8 @@ export function normalizePayload(x: unknown): Payload {
   return {
     entries: entries.map((e) => ({
       id: str(e?.id) || crypto.randomUUID(),
-      // 種類が無いのは種類導入前のデータなので「ログイン」として扱う
-      kind: isKind(e?.kind) ? e.kind : 'login',
+      // 種類が無いのは種類導入前のデータなので「ログイン」、廃止した Wi-Fi・メモは「その他」
+      kind: toKind(e?.kind),
       title: str(e?.title),
       favorite: e?.favorite === true,
       username: str(e?.username),
