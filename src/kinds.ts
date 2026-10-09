@@ -59,11 +59,12 @@ export const KINDS: KindDef[] = [
     fields: [
       { key: 'username', label: 'ログイン ID', placeholder: 'メールアドレス、電話番号、ユーザー名など', mono: true },
       { key: 'password', label: 'パスワード', secret: true, generate: true },
-      { key: 'displayName', label: 'ユーザー名', placeholder: '@で始まる名前や表示名など', mono: true },
-      URL_FIELD,
-      NOTE_FIELD,
+      // ログインと同じ並びで、ユーザー名だけ最初から表示する
+      { key: 'displayName', label: 'ユーザー名', placeholder: '＠以降を入力', mono: true },
       { key: 'email', label: 'メールアドレス', placeholder: 'me@example.com', input: 'email', optional: true, mono: true },
       PHONE_FIELD,
+      { ...URL_FIELD, optional: true },
+      NOTE_FIELD,
     ],
   },
   {

@@ -70,11 +70,12 @@ test('廃止した種類（その他・Wi-Fi・メモ）は「ログイン」と
   ]);
 });
 
-test('SNS の入力欄：指定の順番で、メールアドレスと電話番号は＋で追加する任意の欄', () => {
+test('SNS の入力欄：ログインと同じ並びで、ユーザー名だけ最初から表示（例文は「＠以降を入力」）', () => {
   const sns = KINDS.find((k) => k.id === 'sns')!;
   assert.equal(sns.label, 'SNS');
-  assert.deepEqual(sns.fields.map((f) => f.key), ['username', 'password', 'displayName', 'url', 'note', 'email', 'phone']);
-  assert.deepEqual(sns.fields.filter((f) => f.optional).map((f) => f.key), ['email', 'phone']);
+  assert.deepEqual(sns.fields.map((f) => f.key), ['username', 'password', 'displayName', 'email', 'phone', 'url', 'note']);
+  assert.deepEqual(sns.fields.filter((f) => f.optional).map((f) => f.key), ['email', 'phone', 'url']);
+  assert.equal(sns.fields.find((f) => f.key === 'displayName')!.placeholder, '＠以降を入力');
   assert.equal(KINDS[1].id, 'sns', 'タブはログインの隣');
 });
 
