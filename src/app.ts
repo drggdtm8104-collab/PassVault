@@ -818,11 +818,11 @@ function generatorPanel(onUse: (pw: string) => void): HTMLElement {
 type FieldInput = HTMLInputElement | HTMLTextAreaElement;
 
 /** 値があるときだけ欄を出し、無いときは「＋ ラベル」ボタンにしておく */
-function optionalField(label: string, input: FieldInput, hint?: string): HTMLElement {
+function optionalField(label: string, input: FieldInput): HTMLElement {
   const wrap = h('div', { class: 'add-slot' });
   const reveal = () => {
     wrap.classList.add('full');
-    wrap.replaceChildren(field(label, input, hint));
+    wrap.replaceChildren(field(label, input));
   };
   if (input.value) reveal();
   else wrap.append(button(`＋ ${label}`, () => { reveal(); input.focus(); }, 'small'));
@@ -844,7 +844,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
   const makeInput = (f: FieldDef): FieldInput => {
     let el: FieldInput;
     if (f.input === 'textarea') {
-      el = h('textarea', { rows: 4, autocapitalize: 'none', autocorrect: 'off', spellcheck: false });
+      el = h('textarea', { rows: 4, autocapitalize: 'none', autocorrect: 'off', spellcheck: false, placeholder: f.placeholder ?? '' });
     } else if (f.secret) {
       el = secretInput({ autocomplete: f.generate ? 'new-password' : 'off' });
     } else {
@@ -876,7 +876,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
       const input = makeInput(f);
       if (f.optional) {
         if (!adds) fieldsBox.append((adds = h('div', { class: 'adds' })));
-        adds.append(optionalField(f.label, input, f.hint));
+        adds.append(optionalField(f.label, input));
         continue;
       }
       if (f.secret && input instanceof HTMLInputElement) {
@@ -895,9 +895,9 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
             }));
           }, 'small'));
         }
-        fieldsBox.append(field(f.label, h('div', { class: 'row' }, ...controls), f.hint), genSlot);
+        fieldsBox.append(field(f.label, h('div', { class: 'row' }, ...controls)), genSlot);
       } else {
-        fieldsBox.append(field(f.label, input, f.hint));
+        fieldsBox.append(field(f.label, input));
       }
     }
   };
@@ -943,7 +943,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
     e ? '編集' : '追加',
     [button('キャンセル', () => show(e ? detailScreen(e.id) : listScreen()))],
     kindTabs,
-    field('名前', title, '同じサービスが複数あるときは「X（仕事用）」のように区別すると探しやすくなります'),
+    field('名前', title),
     fieldsBox,
     err,
     save,

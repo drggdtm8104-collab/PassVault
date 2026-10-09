@@ -77,3 +77,9 @@ test('SNS の入力欄：指定の順番で、メールアドレスと電話番�
   assert.deepEqual(sns.fields.filter((f) => f.optional).map((f) => f.key), ['email', 'phone']);
   assert.equal(KINDS[1].id, 'sns', 'タブはログインの隣');
 });
+
+test('ログインの入力欄：パスワード以降はユーザー名・メールアドレス・電話番号・URL の順で、すべて＋で追加', () => {
+  const login = KINDS.find((k) => k.id === 'login')!;
+  assert.deepEqual(login.fields.map((f) => f.key), ['username', 'password', 'displayName', 'email', 'phone', 'url', 'note']);
+  assert.deepEqual(login.fields.filter((f) => f.optional).map((f) => f.key), ['displayName', 'email', 'phone', 'url']);
+});

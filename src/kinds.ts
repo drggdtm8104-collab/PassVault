@@ -10,7 +10,7 @@ export type FieldKey = 'username' | 'password' | 'email' | 'displayName' | 'phon
 export interface FieldDef {
   key: FieldKey;
   label: string;
-  hint?: string;
+  /** 入力欄の中に薄く出す例文 */
   placeholder?: string;
   /** 詳細画面で伏せ字にし、「表示」で見せる */
   secret?: boolean;
@@ -42,12 +42,13 @@ export const KINDS: KindDef[] = [
     label: 'ログイン',
     titlePlaceholder: '例：Amazon、X（仕事用）',
     fields: [
-      { key: 'username', label: 'ログイン ID', hint: 'ログイン画面で入力するもの', placeholder: 'メールアドレス、ユーザー名、会員番号など', mono: true },
+      { key: 'username', label: 'ログイン ID', placeholder: 'メールアドレス、ユーザー名、会員番号など', mono: true },
       { key: 'password', label: 'パスワード', secret: true, generate: true },
-      { key: 'email', label: '登録メールアドレス', hint: 'ログイン ID と別のときだけ', input: 'email', optional: true, mono: true },
-      { key: 'displayName', label: 'ユーザー名', hint: 'ログインに使わない表示名など', optional: true },
+      // パスワード以降は「＋」で追加する任意の欄（この順番で並ぶ）
+      { key: 'displayName', label: 'ユーザー名', placeholder: '表示名やニックネームなど', optional: true },
+      { key: 'email', label: 'メールアドレス', placeholder: 'me@example.com', input: 'email', optional: true, mono: true },
       PHONE_FIELD,
-      URL_FIELD,
+      { ...URL_FIELD, optional: true },
       NOTE_FIELD,
     ],
   },
@@ -56,12 +57,12 @@ export const KINDS: KindDef[] = [
     label: 'SNS',
     titlePlaceholder: '例：X（趣味用）、Instagram',
     fields: [
-      { key: 'username', label: 'ログイン ID', hint: 'ログイン画面で入力するもの', placeholder: 'メールアドレス、電話番号、ユーザー名など', mono: true },
+      { key: 'username', label: 'ログイン ID', placeholder: 'メールアドレス、電話番号、ユーザー名など', mono: true },
       { key: 'password', label: 'パスワード', secret: true, generate: true },
-      { key: 'displayName', label: 'ユーザー名', hint: '@で始まる名前や表示名など', mono: true },
+      { key: 'displayName', label: 'ユーザー名', placeholder: '@で始まる名前や表示名など', mono: true },
       URL_FIELD,
       NOTE_FIELD,
-      { key: 'email', label: 'メールアドレス', hint: '登録しているメールアドレス', input: 'email', optional: true, mono: true },
+      { key: 'email', label: 'メールアドレス', placeholder: 'me@example.com', input: 'email', optional: true, mono: true },
       PHONE_FIELD,
     ],
   },
@@ -72,7 +73,7 @@ export const KINDS: KindDef[] = [
     fields: [
       { key: 'username', label: 'メールアドレス', input: 'email', placeholder: 'me@example.com', mono: true },
       { key: 'password', label: 'パスワード', secret: true, generate: true },
-      { key: 'server', label: 'サーバー情報', hint: '受信・送信サーバー名やポート番号など', input: 'textarea', optional: true },
+      { key: 'server', label: 'サーバー情報', placeholder: '受信・送信サーバー名やポート番号など', input: 'textarea', optional: true },
       PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
@@ -83,7 +84,7 @@ export const KINDS: KindDef[] = [
     label: '銀行・カード',
     titlePlaceholder: '例：楽天銀行、楽天カード',
     fields: [
-      { key: 'number', label: '口座番号・カード番号', hint: '支店名・支店番号なども自由に', mono: true },
+      { key: 'number', label: '口座番号・カード番号', placeholder: '支店名・口座番号など', mono: true },
       { key: 'pin', label: '暗証番号', secret: true, numeric: true },
       { key: 'username', label: 'ネットバンキングのログイン ID', mono: true },
       { key: 'password', label: 'ネットバンキングのパスワード', secret: true, generate: true },
