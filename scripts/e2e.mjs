@@ -453,6 +453,8 @@ await third.page.getByLabel('バックアップ作成時のマスターパスワ
 await btn(third.page, '復元する').click();
 await third.page.getByText('電話番号を 1 件', { exact: false }).waitFor();
 await third.page.getByText('Twitter・Instagram の 3 件を SNS に移しました', { exact: false }).waitFor();
+await third.page.getByText('登録済みの 5 件に「確認」の印を付けました', { exact: false }).waitFor();
+assert.equal(await third.page.locator('.list .flag').count(), 5, '全項目に「確認」の印');
 assert.ok((await third.page.getByLabel('表示').locator('option[value="sns"]').textContent()).includes('SNS（3）'), 'SNS が 3 件');
 await third.page.getByLabel('表示').selectOption('sns');
 for (const t of ['Twitter（趣味）', 'X（仕事用）', 'Instagram']) await third.page.locator('.list .name', { hasText: t }).first().waitFor();

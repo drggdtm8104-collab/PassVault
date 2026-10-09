@@ -7,6 +7,7 @@ import { clearUnusedFields, isKind, KIND_IDS, KINDS, kindDef, subtitle, type Fie
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
+import { flagAllForReview } from './migrate-flag.ts';
 import { migrateSns } from './migrate-sns.ts';
 import { migratePhones } from './phone.ts';
 import { matchesQuery, normalizeForSearch, parseQuery } from './search.ts';
@@ -315,24 +316,28 @@ function enterSession(file: VaultFile, dek: CryptoKey, payload: unknown, readOnl
 /** 解除直後に 1 回だけ行うデータの移行（閲覧モードでは保存せず表示にだけ反映） */
 async function runMigrations(): Promise<void> {
   const s = session;
-  if (!s || (s.payload.phoneMigrated && s.payload.snsMigrated)) return;
+  if (!s || (s.payload.phoneMigrated && s.payload.snsMigrated && s.payload.flagAllDone)) return;
   const phone = migratePhones(s.payload);
   const sns = migrateSns(phone.payload);
-  const next = sns.payload;
   if (s.readOnly) {
-    s.payload = next;
+    // バックアップを見るだけのときは表示にだけ反映（「確認」の一括付与はしない）
+    s.payload = sns.payload;
     show(listScreen());
     return;
   }
-  const changed = phone.copied + sns.moved > 0;
+  const flag = flagAllForReview(sns.payload);
+  const next = flag.payload;
+  const changed = phone.copied + sns.moved + flag.flagged > 0;
   await commit((p) => {
     p.entries = next.entries;
     p.phoneMigrated = true;
     p.snsMigrated = true;
+    p.flagAllDone = true;
   }, { touch: changed }, s);
   const messages = [
     phone.copied > 0 && `メモの電話番号を ${phone.copied} 件、電話番号の欄にコピーしました`,
     sns.moved > 0 && `Twitter・Instagram の ${sns.moved} 件を SNS に移しました`,
+    flag.flagged > 0 && `登録済みの ${flag.flagged} 件に「確認」の印を付けました`,
   ].filter(Boolean);
   if (messages.length > 0) {
     toast(messages.join('。'));

@@ -52,6 +52,8 @@ export interface Payload {
   phoneMigrated: boolean;
   /** ログインの Twitter・Instagram を SNS に移す処理を実行済みか（migrate-sns.ts） */
   snsMigrated: boolean;
+  /** 登録済みの全項目に「更新が必要」を付ける処理を実行済みか（migrate-flag.ts） */
+  flagAllDone: boolean;
 }
 
 export const AUTO_LOCK_CHOICES = [1, 3, 5, 10];
@@ -65,6 +67,7 @@ export function emptyPayload(): Payload {
     lastBackupAt: null,
     phoneMigrated: true,
     snsMigrated: true,
+    flagAllDone: true,
   };
 }
 
@@ -111,5 +114,6 @@ export function normalizePayload(x: unknown): Payload {
     lastBackupAt: typeof p.lastBackupAt === 'number' ? p.lastBackupAt : null,
     phoneMigrated: p.phoneMigrated === true,
     snsMigrated: p.snsMigrated === true,
+    flagAllDone: p.flagAllDone === true,
   };
 }
