@@ -9,6 +9,8 @@ export interface Entry {
   title: string;
   /** お気に入り */
   favorite: boolean;
+  /** 更新が必要（仮登録・要更新・情報不足を忘れないための印） */
+  needsUpdate: boolean;
   /** ログイン ID（ログイン画面で入力するもの。メールアドレス・ユーザー名・会員番号など） */
   username: string;
   /** 登録メールアドレス（ログイン ID と別の場合だけ） */
@@ -82,6 +84,7 @@ export function normalizePayload(x: unknown): Payload {
       kind: toKind(e?.kind),
       title: str(e?.title),
       favorite: e?.favorite === true,
+      needsUpdate: e?.needsUpdate === true,
       username: str(e?.username),
       email: str(e?.email),
       displayName: str(e?.displayName),

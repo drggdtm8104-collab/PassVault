@@ -157,7 +157,13 @@ await page.getByRole('tab', { name: '銀行・カード' }).click();
 await page.getByLabel('名前', { exact: true }).fill('楽天銀行');
 await page.getByLabel('口座番号・カード番号').fill('普通 1234567');
 await page.getByLabel('暗証番号').fill('4321');
+// 「更新が必要」は保存ボタンの直前
+const checkBox = await page.getByLabel('更新が必要').boundingBox();
+const saveBox = await btn(page, '保存').boundingBox();
+assert.ok(checkBox.y < saveBox.y, '「更新が必要」は保存ボタンの前');
+await page.getByLabel('更新が必要').check();
 await btn(page, '保存').click();
+await page.locator('.flag', { hasText: '要更新' }).waitFor();
 await page.getByText('普通 1234567').waitFor();
 assert.equal(await page.getByText('4321').count(), 0, '暗証番号は最初は伏せ字');
 await page.getByRole('button', { name: '表示' }).first().click();
@@ -184,6 +190,8 @@ for (const b of await page.locator('.list .badge').all()) {
   assert.ok(Math.abs(listBox.x + listBox.width - (box.x + box.width)) < 24, '種類の表示が右端にある');
 }
 await shot(page, '17b-list-all');
+assert.equal(await page.locator('.list li', { hasText: '楽天銀行' }).locator('.flag').textContent(), '要更新', '一覧に「要更新」マーク');
+assert.equal(await page.locator('.list .flag').count(), 1, '要更新の項目だけにマーク');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
 // SNS：入力欄の順番と＋で追加する欄
 await btn(page, '追加').click();

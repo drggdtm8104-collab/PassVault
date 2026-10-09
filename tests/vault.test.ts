@@ -25,6 +25,7 @@ function samplePayload(): Payload {
     id: 'a',
     kind: 'login',
     favorite: false,
+    needsUpdate: false,
     title: 'Example',
     username: 'me@example.com',
     email: '',

@@ -702,6 +702,7 @@ function listScreen(query = ''): HTMLElement {
           h('span', { class: 'title' },
             e.favorite ? h('span', { class: 'star', 'aria-label': 'お気に入り' }, '★') : null,
             h('span', { class: 'name' }, e.title || '（名前なし）'),
+            e.needsUpdate ? h('span', { class: 'flag' }, '要更新') : null,
             // 種類は右端に固定（絞り込み中の種類と同じなら出さない）
             listFilter === 'all' || listFilter === 'fav' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
           ),
@@ -813,6 +814,7 @@ function detailScreen(id: string): HTMLElement {
       ro ? null : favButton(e),
       ro ? null : button('編集', () => show(editScreen(e.id)), 'small'),
     ].filter(Boolean) as Node[],
+    e.needsUpdate ? h('p', null, h('span', { class: 'flag' }, '要更新')) : null,
     rows.some(Boolean) ? h('div', { class: 'card' }, ...rows) : h('p', { class: 'muted' }, '名前以外は未入力です。'),
     h('p', { class: 'muted' }, `種類：${def.label}　更新：${formatDate(e.updatedAt)}`),
     ro ? null : button('削除', () => {
@@ -886,6 +888,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
   const kindTabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': '種類' });
   const fieldsBox = h('div', { class: 'stack fields' });
   const err = h('p', { class: 'error', role: 'alert' });
+  const needsUpdate = h('input', { type: 'checkbox', checked: e?.needsUpdate ?? false });
 
   const makeInput = (f: FieldDef): FieldInput => {
     let el: FieldInput;
@@ -970,6 +973,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
         id: e?.id ?? crypto.randomUUID(),
         kind,
         favorite: e?.favorite ?? defaultFavorite,
+        needsUpdate: needsUpdate.checked,
         title: title.value.trim(),
         ...(Object.fromEntries(ALL_FIELD_KEYS.map((k) => [k, clean(k)])) as Record<FieldKey, string>),
         createdAt: e?.createdAt ?? now,
@@ -991,6 +995,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
     kindTabs,
     field('名前', title),
     fieldsBox,
+    h('label', { class: 'check' }, needsUpdate, '更新が必要'),
     err,
     save,
   );

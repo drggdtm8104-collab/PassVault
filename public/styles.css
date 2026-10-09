@@ -107,6 +107,7 @@ textarea { resize: vertical; }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .hidden { display: none; }
 .star { color: #e0a100; flex-shrink: 0; }
+.flag { display: inline-block; flex-shrink: 0; padding: 0 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); font-size: 0.7rem; font-weight: 700; }
 button.fav { font-size: 1.1rem; min-width: 44px; }
 button.fav[aria-pressed="true"] { color: #e0a100; border-color: #e0a100; }
 .adds { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -7,7 +7,7 @@ import type { Entry } from '../src/model.ts';
 
 function entry(p: Partial<Entry>): Entry {
   return {
-    id: '1', kind: 'login', favorite: false, title: 'T', username: '', password: '', email: '', displayName: '',
+    id: '1', kind: 'login', favorite: false, needsUpdate: false, title: 'T', username: '', password: '', email: '', displayName: '',
     number: '', pin: '', server: '', phone: '', url: '', note: '', createdAt: 0, updatedAt: 0, ...p,
   };
 }
@@ -83,4 +83,13 @@ test('ログインの入力欄：パスワード以降はユーザー名・メ�
   const login = KINDS.find((k) => k.id === 'login')!;
   assert.deepEqual(login.fields.map((f) => f.key), ['username', 'password', 'displayName', 'email', 'phone', 'url', 'note']);
   assert.deepEqual(login.fields.filter((f) => f.optional).map((f) => f.key), ['displayName', 'email', 'phone', 'url']);
+});
+
+test('「更新が必要」：読み込み時は true のときだけ有効、平文書き出しに含める', () => {
+  const p = normalizePayload({ entries: [{ title: 'A', needsUpdate: true }, { title: 'B', needsUpdate: 'yes' }, { title: 'C' }] });
+  assert.deepEqual(p.entries.map((x) => x.needsUpdate), [true, false, false]);
+  const flagged = entry({ title: '仮', needsUpdate: true });
+  assert.ok(toText([flagged], 0).includes('状態: 更新が必要'));
+  assert.ok(toCsv([flagged]).includes('状態: 更新が必要'));
+  assert.ok(!toText([entry({ title: '通常' })], 0).includes('状態:'));
 });

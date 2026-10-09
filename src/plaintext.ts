@@ -23,6 +23,7 @@ export function toText(entries: Entry[], now = Date.now()): string {
     lines.push('----------------------------------------');
     lines.push(`名前: ${e.title}`);
     lines.push(`種類: ${def.label}`);
+    if (e.needsUpdate) lines.push('状態: 更新が必要');
     for (const f of def.fields) {
       const v = e[f.key];
       // 空の任意項目は出さない。必須の欄は空でも見出しを出す（書き漏れに気づけるように）
@@ -55,7 +56,9 @@ export function toCsv(entries: Entry[]): string {
     const extra = def.fields
       .filter((f) => !['username', 'password', 'url', 'note'].includes(f.key) && e[f.key])
       .map((f) => `${f.label}: ${e[f.key]}`);
-    const notes = [e.note, e.kind !== 'login' && `種類: ${def.label}`, ...extra].filter(Boolean).join('\n');
+    const notes = [e.note, e.kind !== 'login' && `種類: ${def.label}`, e.needsUpdate && '状態: 更新が必要', ...extra]
+      .filter(Boolean)
+      .join('\n');
     rows.push([e.title, e.url, e.username, e.password, notes, '']);
   }
   return rows.map((r) => r.map(csvField).join(',')).join('\r\n') + '\r\n';

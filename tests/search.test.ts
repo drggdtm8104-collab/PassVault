@@ -4,7 +4,7 @@ import { matchesQuery, normalizeForSearch, parseQuery } from '../src/search.ts';
 import type { Entry } from '../src/model.ts';
 
 function entry(p: Partial<Entry>): Entry {
-  return { id: '1', kind: 'login', favorite: false, title: '', number: '', pin: '', server: '', phone: '', username: '', email: '', displayName: '', password: 'SECRET', url: '', note: '', createdAt: 0, updatedAt: 0, ...p };
+  return { id: '1', kind: 'login', favorite: false, needsUpdate: false, title: '', number: '', pin: '', server: '', phone: '', username: '', email: '', displayName: '', password: 'SECRET', url: '', note: '', createdAt: 0, updatedAt: 0, ...p };
 }
 
 const find = (e: Entry, q: string) => matchesQuery(e, parseQuery(q));

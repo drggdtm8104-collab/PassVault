@@ -45,6 +45,7 @@ const entries: Entry[] = [
     id: '1',
     kind: 'login',
     favorite: false,
+    needsUpdate: false,
     title: 'A, "B"',
     username: 'u',
     email: 'mail@example.com',
