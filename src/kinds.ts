@@ -2,7 +2,7 @@
 
 import type { Entry } from './model.ts';
 
-export type Kind = 'login' | 'sns' | 'email' | 'bank' | 'other';
+export type Kind = 'login' | 'sns' | 'email' | 'bank';
 
 /** 種類によって使い分ける Entry の欄 */
 export type FieldKey = 'username' | 'password' | 'email' | 'displayName' | 'phone' | 'number' | 'pin' | 'server' | 'url' | 'note';
@@ -92,22 +92,13 @@ export const KINDS: KindDef[] = [
       NOTE_FIELD,
     ],
   },
-  {
-    id: 'other',
-    label: 'その他',
-    titlePlaceholder: '例：自宅の Wi-Fi、マイナンバーカード',
-    fields: [
-      { key: 'username', label: 'ID', hint: 'ID・番号・ネットワーク名など', mono: true },
-      { key: 'password', label: 'パスワード', hint: 'パスワード・暗証番号など', secret: true, generate: true },
-      PHONE_FIELD,
-      URL_FIELD,
-      NOTE_FIELD,
-    ],
-  },
 ];
 
-/** 廃止した種類（Wi-Fi・メモ）は「その他」として読み込む */
-const RETIRED_KINDS: Record<string, Kind> = { wifi: 'other', note: 'other' };
+/**
+ * 廃止した種類（その他・Wi-Fi・メモ）は「ログイン」として読み込む。
+ * いずれも使っていた欄（ID・パスワード・URL・メモ）はログインにもあるので、中身は失われない。
+ */
+const RETIRED_KINDS: Record<string, Kind> = { other: 'login', wifi: 'login', note: 'login' };
 
 /** 保存データの種類の値を、今の種類に直す（不明なものは「ログイン」） */
 export function toKind(v: unknown): Kind {

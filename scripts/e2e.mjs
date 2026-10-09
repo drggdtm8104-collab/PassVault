@@ -137,16 +137,13 @@ await page.getByText('見つかりません').waitFor();
 await search.fill('');
 step('検索：全角・登録メール・複数語で見つかり、無ければ「見つかりません」');
 
-// 種類：その他と銀行・カードを登録し、種類で絞り込む
+// 種類：銀行・カードなどを登録し、種類で絞り込む
 await btn(page, '追加').click();
-assert.equal(await page.getByRole('tab', { name: 'Wi-Fi' }).count(), 0, 'Wi-Fi の種類は無い');
-assert.equal(await page.getByRole('tab', { name: 'メモ' }).count(), 0, 'メモの種類は無い');
-await page.getByRole('tab', { name: 'その他' }).click();
-assert.equal(await page.getByLabel('暗証番号').count(), 0, 'その他に暗証番号欄は無い');
+assert.deepEqual(await page.getByRole('tab').allTextContents(), ['ログイン', 'SNS', 'メール', '銀行・カード'], '種類のタブ（その他は無い）');
 await page.getByLabel('名前', { exact: true }).fill('自宅の Wi-Fi');
-await page.getByLabel('ID', { exact: true }).fill('MyHomeNet');
+await page.getByLabel('ログイン ID').fill('MyHomeNet');
 await page.getByLabel('パスワード', { exact: true }).fill('wifi-pass-123');
-await shot(page, '15-edit-other');
+await shot(page, '15-edit-tabs');
 await btn(page, '保存').click();
 await page.getByText('MyHomeNet').waitFor();
 await btn(page, '一覧').click();
@@ -165,13 +162,13 @@ await shot(page, '16-detail-bank');
 await btn(page, '一覧').click();
 
 const filter = page.getByLabel('表示');
-assert.ok((await filter.locator('option[value="other"]').textContent()).includes('その他（1）'), '件数が選択肢に出る');
-assert.equal(await filter.locator('option[value="wifi"]').count(), 0);
-await filter.selectOption('other');
-await page.getByText('自宅の Wi-Fi').waitFor();
-assert.equal(await page.getByText('楽天銀行').count(), 0);
+assert.ok((await filter.locator('option[value="bank"]').textContent()).includes('銀行・カード（1）'), '件数が選択肢に出る');
+assert.equal(await filter.locator('option[value="other"]').count(), 0, '「その他」は選択肢に無い');
+await filter.selectOption('bank');
+await page.getByText('楽天銀行').waitFor();
+assert.equal(await page.getByText('自宅の Wi-Fi').count(), 0);
 assert.equal(await page.getByText('Example <script>', { exact: false }).count(), 0);
-await shot(page, '17-filter-other');
+await shot(page, '17-filter-bank');
 await filter.selectOption('all');
 await page.getByText('楽天銀行').waitFor();
 // 種類の表示は右端に固定
@@ -192,7 +189,7 @@ assert.deepEqual(labels, ['ログイン ID', 'パスワード', 'ユーザー名
 assert.deepEqual(await page.locator('.fields .adds button').allTextContents(), ['＋ メールアドレス', '＋ 電話番号']);
 await shot(page, '20-edit-sns');
 await btn(page, 'キャンセル').click();
-step('種類ごとの入力欄（その他・銀行）、暗証番号の伏せ字、種類での絞り込み、プルダウンと一覧の隙間');
+step('種類のタブ（その他なし）、銀行の入力欄、暗証番号の伏せ字、種類での絞り込み、プルダウンと一覧の隙間');
 
 // お気に入り
 await page.getByText('楽天銀行').click();

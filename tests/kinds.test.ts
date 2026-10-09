@@ -21,17 +21,17 @@ test('種類の定義：すべての種類に名前があり、欄の重複が�
 });
 
 test('種類を変えたら、使わない欄は空にする', () => {
-  const e = clearUnusedFields(entry({ kind: 'other', username: 'MySSID', password: 'pw', email: 'a@b', url: 'https://x', pin: '1234' }));
-  assert.equal(e.username, 'MySSID');
+  const e = clearUnusedFields(entry({ kind: 'email', username: 'me@example.com', password: 'pw', displayName: 'ひろ', url: 'https://x', pin: '1234' }));
+  assert.equal(e.username, 'me@example.com');
   assert.equal(e.password, 'pw');
   assert.equal(e.url, 'https://x');
-  assert.equal(e.email, '');
+  assert.equal(e.displayName, '');
   assert.equal(e.pin, '');
 });
 
 test('一覧の 2 行目に秘密の欄を出さない', () => {
   assert.equal(subtitle(entry({ kind: 'login', username: 'me' })), 'me');
-  assert.equal(subtitle(entry({ kind: 'other', username: 'MySSID' })), 'MySSID');
+  assert.equal(subtitle(entry({ kind: 'sns', username: 'me', displayName: '@hiro' })), 'me');
   assert.equal(subtitle(entry({ kind: 'bank', number: '1234', pin: '9999' })), '');
 });
 
@@ -46,21 +46,28 @@ test('銀行・カードの平文書き出し：暗証番号・番号も含め�
 });
 
 test('メモの複数行は字下げして書き出す', () => {
-  const txt = toText([entry({ kind: 'other', title: 'コード', note: 'aaa\nbbb' })], 0);
+  const txt = toText([entry({ kind: 'login', title: 'コード', note: 'aaa\nbbb' })], 0);
   assert.ok(txt.includes('メモ:\n  aaa\n  bbb'));
 });
 
-test('廃止した種類（Wi-Fi・メモ）は「その他」として読み込み、中身は残す', () => {
-  assert.equal(toKind('wifi'), 'other');
-  assert.equal(toKind('note'), 'other');
+test('廃止した種類（その他・Wi-Fi・メモ）は「ログイン」として読み込み、中身は残す', () => {
+  assert.ok(!KINDS.some((k) => (k.id as string) === 'other'), '「その他」は選べない');
+  assert.equal(toKind('other'), 'login');
+  assert.equal(toKind('wifi'), 'login');
+  assert.equal(toKind('note'), 'login');
   assert.equal(toKind('bank'), 'bank');
   assert.equal(toKind(undefined), 'login');
   assert.equal(toKind('unknown'), 'login');
   const p = normalizePayload({ entries: [
     { kind: 'wifi', title: '自宅', username: 'MySSID', password: 'pw' },
     { kind: 'note', title: 'コード', note: 'aaa' },
+    { kind: 'other', title: '保険', username: 'No.123', password: 'pw2', url: 'https://ins.example', note: 'メモ' },
   ] });
-  assert.deepEqual(p.entries.map((e) => [e.kind, e.username, e.password, e.note]), [['other', 'MySSID', 'pw', ''], ['other', '', '', 'aaa']]);
+  assert.deepEqual(p.entries.map((e) => [e.kind, e.username, e.password, e.url, e.note]), [
+    ['login', 'MySSID', 'pw', '', ''],
+    ['login', '', '', '', 'aaa'],
+    ['login', 'No.123', 'pw2', 'https://ins.example', 'メモ'],
+  ]);
 });
 
 test('SNS の入力欄：指定の順番で、メールアドレスと電話番号は＋で追加する任意の欄', () => {
