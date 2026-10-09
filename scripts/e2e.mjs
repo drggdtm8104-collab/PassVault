@@ -383,7 +383,13 @@ step('5 回失敗すると待ち時間がかかる');
 // 電話番号の移行：電話番号の欄が無かった頃の形式のバックアップを復元すると、メモの番号がコピーされる
 const { createVault } = await import('../src/vault.ts');
 const oldPayload = {
-  entries: [{ id: 'old1', kind: 'login', title: '旧データ', username: 'old@example.com', password: 'pw', url: '', note: '窓口 0120-123-456\n担当 田中', createdAt: 1, updatedAt: 1 }],
+  entries: [
+    { id: 'old1', kind: 'login', title: '旧データ', username: 'old@example.com', password: 'pw', url: '', note: '窓口 0120-123-456\n担当 田中', createdAt: 1, updatedAt: 1 },
+    { id: 'tw1', kind: 'login', title: 'Twitter（趣味）', username: 'tw@example.com', password: 'twpw', url: '', note: '', createdAt: 1, updatedAt: 1 },
+    { id: 'x1', kind: 'login', title: 'X（仕事用）', username: 'x@example.com', password: 'xpw', url: '', note: '', createdAt: 1, updatedAt: 1 },
+    { id: 'ig1', kind: 'login', title: 'Instagram', username: 'ig@example.com', password: 'igpw', url: '', note: '', createdAt: 1, updatedAt: 1 },
+    { id: 'xs1', kind: 'login', title: 'Xserver', username: 'xs', password: 'xspw', url: '', note: '', createdAt: 1, updatedAt: 1 },
+  ],
   settings: { autoLockMinutes: 3, clipboardClearSeconds: 30, relockGraceSeconds: 0 },
   modifiedAt: 1,
   lastBackupAt: null,
@@ -399,6 +405,14 @@ await (await chooser3).setFiles(oldPath);
 await third.page.getByLabel('バックアップ作成時のマスターパスワード').fill(MASTER);
 await btn(third.page, '復元する').click();
 await third.page.getByText('電話番号を 1 件', { exact: false }).waitFor();
+await third.page.getByText('Twitter・Instagram の 3 件を SNS に移しました', { exact: false }).waitFor();
+assert.ok((await third.page.getByLabel('表示').locator('option[value="sns"]').textContent()).includes('SNS（3）'), 'SNS が 3 件');
+await third.page.getByLabel('表示').selectOption('sns');
+for (const t of ['Twitter（趣味）', 'X（仕事用）', 'Instagram']) await third.page.locator('.list .name', { hasText: t }).first().waitFor();
+assert.equal(await third.page.locator('.list .name').count(), 3, 'SNS で絞り込むと 3 件');
+assert.equal(await third.page.getByText('Xserver').count(), 0, 'Xserver は SNS にしない');
+await shot(third.page, '21-sns-migrated');
+await third.page.getByLabel('表示').selectOption('all');
 await third.page.getByText('旧データ').click();
 await third.page.getByText('0120-123-456').first().waitFor();
 assert.equal(await third.page.locator('.detail-row', { hasText: '電話番号' }).count(), 1, '電話番号の欄に入っている');
@@ -412,10 +426,10 @@ await third.page.getByLabel('マスターパスワード').fill(MASTER);
 await btn(third.page, '開く').click();
 await third.page.getByText('旧データ').waitFor();
 await third.page.waitForTimeout(500);
-assert.equal(await third.page.locator('#toast.show', { hasText: '電話番号を' }).count(), 0, '移行は 1 回だけ');
+assert.equal(await third.page.locator('#toast.show', { hasText: '件' }).count(), 0, '移行は 1 回だけ');
 await third.page.getByText('旧データ').click();
 await third.page.locator('.detail-row', { hasText: '電話番号' }).waitFor();
-step('旧形式のデータ：メモの電話番号を電話番号の欄にコピー（メモは残す、1 回だけ）');
+step('旧形式のデータ：メモの電話番号をコピー、Twitter・X・Instagram を SNS に移す（1 回だけ）');
 
 const all = [...problems, ...other.problems, ...third.problems].filter((p) => !p.includes('favicon'));
 assert.deepEqual(all, [], 'コンソールエラー・CSP 違反なし');

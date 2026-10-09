@@ -48,6 +48,8 @@ export interface Payload {
   lastBackupAt: number | null;
   /** メモの電話番号を電話番号の欄へコピーする処理を実行済みか（phone.ts） */
   phoneMigrated: boolean;
+  /** ログインの Twitter・Instagram を SNS に移す処理を実行済みか（migrate-sns.ts） */
+  snsMigrated: boolean;
 }
 
 export const AUTO_LOCK_CHOICES = [1, 3, 5, 10];
@@ -60,6 +62,7 @@ export function emptyPayload(): Payload {
     modifiedAt: Date.now(),
     lastBackupAt: null,
     phoneMigrated: true,
+    snsMigrated: true,
   };
 }
 
@@ -104,5 +107,6 @@ export function normalizePayload(x: unknown): Payload {
     modifiedAt: num(p.modifiedAt, base.modifiedAt),
     lastBackupAt: typeof p.lastBackupAt === 'number' ? p.lastBackupAt : null,
     phoneMigrated: p.phoneMigrated === true,
+    snsMigrated: p.snsMigrated === true,
   };
 }

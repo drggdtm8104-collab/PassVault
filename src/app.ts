@@ -7,6 +7,7 @@ import { clearUnusedFields, KIND_IDS, KINDS, kindDef, subtitle, type FieldDef, t
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
+import { migrateSns } from './migrate-sns.ts';
 import { migratePhones } from './phone.ts';
 import { matchesQuery, parseQuery } from './search.ts';
 import {
@@ -287,17 +288,30 @@ function enterSession(file: VaultFile, dek: CryptoKey, payload: unknown, readOnl
 /** 解除直後に 1 回だけ行うデータの移行（閲覧モードでは保存せず表示にだけ反映） */
 async function runMigrations(): Promise<void> {
   const s = session;
-  if (!s || s.payload.phoneMigrated) return;
-  const { payload, copied } = migratePhones(s.payload);
+  if (!s || (s.payload.phoneMigrated && s.payload.snsMigrated)) return;
+  const phone = migratePhones(s.payload);
+  const sns = migrateSns(phone.payload);
+  const next = sns.payload;
   if (s.readOnly) {
-    s.payload = payload;
+    s.payload = next;
+    show(listScreen());
     return;
   }
+  const changed = phone.copied + sns.moved > 0;
   await commit((p) => {
-    p.entries = payload.entries;
+    p.entries = next.entries;
     p.phoneMigrated = true;
-  }, { touch: copied > 0 }, s);
-  if (copied > 0) toast(`メモに書かれていた電話番号を ${copied} 件、電話番号の欄にコピーしました`);
+    p.snsMigrated = true;
+  }, { touch: changed }, s);
+  const messages = [
+    phone.copied > 0 && `メモの電話番号を ${phone.copied} 件、電話番号の欄にコピーしました`,
+    sns.moved > 0 && `Twitter・Instagram の ${sns.moved} 件を SNS に移しました`,
+  ].filter(Boolean);
+  if (messages.length > 0) {
+    toast(messages.join('。'));
+    // 一覧の種類表示・件数を更新する（一覧を見ている場合のみ）
+    if (session === s && root.querySelector('.list')) show(listScreen());
+  }
 }
 
 // ---------------------------------------------------------------- アプリを離れたとき
