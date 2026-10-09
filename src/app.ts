@@ -264,6 +264,28 @@ function resetIdle(): void {
 /** ロック時にゼロで消す一時的な鍵素材（Face ID 登録の 2 段階目まで保持する DEK など） */
 const pendingSecrets = new Set<Uint8Array>();
 
+// ---------------------------------------------------------------- アプリの更新
+//
+// 新しい版が届いたら読み込み直して反映する。ただし解除中・入力途中・Face ID の確認中は
+// 邪魔をしないよう、次にロックしたとき（またはアプリに戻ってきたとき）まで待つ。
+
+let pendingReload = false;
+let bioPrompting = false;
+
+function canReloadNow(): boolean {
+  if (session || bioPrompting) return false;
+  const typed = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')].some(
+    (el) => el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'file' && el.value !== '',
+  );
+  return !typed;
+}
+
+/** 新しい版の Service Worker が有効になったときに呼ばれる */
+export function onAppUpdated(): void {
+  pendingReload = true;
+  if (canReloadNow()) location.reload();
+}
+
 function lock(message?: string): void {
   const wasReadOnly = session?.readOnly;
   session = null;
@@ -273,6 +295,10 @@ function lock(message?: string): void {
   clearClipboardIfDue(true);
   for (const b of pendingSecrets) wipe(b);
   pendingSecrets.clear();
+  if (pendingReload) {
+    location.reload();
+    return;
+  }
   void start(message ?? (wasReadOnly ? '閲覧を終了しました' : undefined));
 }
 
@@ -348,6 +374,10 @@ function onVisible(): void {
     } else {
       lock();
     }
+    return;
+  }
+  if (pendingReload && canReloadNow()) {
+    location.reload();
     return;
   }
   autoBio?.();
@@ -500,6 +530,7 @@ function unlockScreen(file: VaultFile, bio: BioRecord | null, message?: string):
   async function tryBio(auto: boolean): Promise<void> {
     if (!bio || !bioBtn || bioBusy || document.hidden) return;
     bioBusy = true;
+    bioPrompting = true;
     err.textContent = '';
     try {
       await busy(bioBtn, '認証中…', async () => {
@@ -529,6 +560,7 @@ function unlockScreen(file: VaultFile, bio: BioRecord | null, message?: string):
       });
     } finally {
       bioBusy = false;
+      bioPrompting = false;
     }
   }
 

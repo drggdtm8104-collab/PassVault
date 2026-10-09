@@ -77,4 +77,4 @@ node scripts/make-icons.mjs   # アイコンを作り直すとき
 3. リポジトリの Settings → Pages → Source:「Deploy from a branch」、Branch:`main` / フォルダ:`/docs`
 4. 数分後に `https://<ユーザー名>.github.io/PassVault/` で開ける
 
-更新するときは、変更 → `npm test` → `npm run build` → コミット → push。iPhone 側は次回起動時に新しいバージョンを取り込み、その次の起動から反映されます（データはそのまま）。
+更新するときは、変更 → `npm test` → `npm run build` → コミット → push。iPhone 側は、アプリを開いたとき・戻ってきたときに新しい版を確認し、ロック中なら自動で読み込み直して反映する（解除中は次にロックしたとき）。データはそのまま。

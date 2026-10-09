@@ -431,7 +431,48 @@ await third.page.getByText('旧データ').click();
 await third.page.locator('.detail-row', { hasText: '電話番号' }).waitFor();
 step('旧形式のデータ：メモの電話番号をコピー、Twitter・X・Instagram を SNS に移す（1 回だけ）');
 
-const all = [...problems, ...other.problems, ...third.problems].filter((p) => !p.includes('favicon'));
+// アプリの更新：ロック中はすぐ読み込み直し、解除中は次のロックまで待つ
+const swPath = new URL('../docs/sw.js', import.meta.url);
+const swOriginal = readFileSync(swPath, 'utf8');
+const fourth = await newPage();
+try {
+  await fourth.page.goto(BASE);
+  await fourth.page.getByText('新しく始める').waitFor();
+  await fourth.page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  const triggerUpdate = async (n) => {
+    writeFileSync(swPath, swOriginal + `\n/* e2e update ${n} */\n`);
+    await fourth.page.evaluate(() => { window.__marker = 1; document.dispatchEvent(new Event('visibilitychange')); });
+  };
+
+  // ロック中（初回画面・入力なし）：自動で読み込み直す
+  const reloaded = fourth.page.waitForEvent('load');
+  await triggerUpdate(1);
+  await reloaded;
+  assert.equal(await fourth.page.evaluate(() => window.__marker), undefined, '読み込み直された');
+  await fourth.page.getByText('新しく始める').waitFor();
+  step('更新：ロック中は新しい版が届くと自動で読み込み直す（開き直し 1 回で反映）');
+
+  // 解除中：読み込み直さず、ロックしたときに読み込み直す
+  await btn(fourth.page, '新しく始める').click();
+  await fourth.page.getByLabel('マスターパスワード', { exact: true }).fill(MASTER);
+  await fourth.page.getByLabel('もう一度入力').fill(MASTER);
+  await fourth.page.getByText('忘れると復元できないことを理解しました').click();
+  await btn(fourth.page, '作成する').click();
+  await fourth.page.getByText('まだ登録がありません', { exact: false }).waitFor();
+  await fourth.page.waitForTimeout(1000);
+  await triggerUpdate(2);
+  await fourth.page.waitForTimeout(3000);
+  assert.equal(await fourth.page.evaluate(() => window.__marker), 1, '解除中は読み込み直さない');
+  const reloaded2 = fourth.page.waitForEvent('load');
+  await btn(fourth.page, 'ロック').click();
+  await reloaded2;
+  await fourth.page.getByLabel('マスターパスワード').waitFor();
+  step('更新：解除中は邪魔をせず、ロックしたときに読み込み直す');
+} finally {
+  writeFileSync(swPath, swOriginal);
+}
+
+const all = [...problems, ...other.problems, ...third.problems, ...fourth.problems].filter((p) => !p.includes('favicon'));
 assert.deepEqual(all, [], 'コンソールエラー・CSP 違反なし');
 step('コンソールエラー・CSP 違反なし');
 
