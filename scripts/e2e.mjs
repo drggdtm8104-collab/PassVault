@@ -184,6 +184,14 @@ for (const b of await page.locator('.list .badge').all()) {
 }
 await shot(page, '17b-list-all');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
+// SNS：入力欄の順番と＋で追加する欄
+await btn(page, '追加').click();
+await page.getByRole('tab', { name: 'SNS' }).click();
+const labels = await page.locator('.fields .field > label').allTextContents();
+assert.deepEqual(labels, ['ログイン ID', 'パスワード', 'ユーザー名', 'URL', 'メモ'], 'SNS の欄の順番');
+assert.deepEqual(await page.locator('.fields .adds button').allTextContents(), ['＋ メールアドレス', '＋ 電話番号']);
+await shot(page, '20-edit-sns');
+await btn(page, 'キャンセル').click();
 step('種類ごとの入力欄（その他・銀行）、暗証番号の伏せ字、種類での絞り込み、プルダウンと一覧の隙間');
 
 // お気に入り

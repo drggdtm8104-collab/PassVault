@@ -62,3 +62,11 @@ test('廃止した種類（Wi-Fi・メモ）は「その他」として読み込
   ] });
   assert.deepEqual(p.entries.map((e) => [e.kind, e.username, e.password, e.note]), [['other', 'MySSID', 'pw', ''], ['other', '', '', 'aaa']]);
 });
+
+test('SNS の入力欄：指定の順番で、メールアドレスと電話番号は＋で追加する任意の欄', () => {
+  const sns = KINDS.find((k) => k.id === 'sns')!;
+  assert.equal(sns.label, 'SNS');
+  assert.deepEqual(sns.fields.map((f) => f.key), ['username', 'password', 'displayName', 'url', 'note', 'email', 'phone']);
+  assert.deepEqual(sns.fields.filter((f) => f.optional).map((f) => f.key), ['email', 'phone']);
+  assert.equal(KINDS[1].id, 'sns', 'タブはログインの隣');
+});

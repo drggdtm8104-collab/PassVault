@@ -2,7 +2,7 @@
 
 import type { Entry } from './model.ts';
 
-export type Kind = 'login' | 'email' | 'bank' | 'other';
+export type Kind = 'login' | 'sns' | 'email' | 'bank' | 'other';
 
 /** 種類によって使い分ける Entry の欄 */
 export type FieldKey = 'username' | 'password' | 'email' | 'displayName' | 'phone' | 'number' | 'pin' | 'server' | 'url' | 'note';
@@ -49,6 +49,20 @@ export const KINDS: KindDef[] = [
       PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
+    ],
+  },
+  {
+    id: 'sns',
+    label: 'SNS',
+    titlePlaceholder: '例：X（趣味用）、Instagram',
+    fields: [
+      { key: 'username', label: 'ログイン ID', hint: 'ログイン画面で入力するもの', placeholder: 'メールアドレス、電話番号、ユーザー名など', mono: true },
+      { key: 'password', label: 'パスワード', secret: true, generate: true },
+      { key: 'displayName', label: 'ユーザー名', hint: '@で始まる名前や表示名など', mono: true },
+      URL_FIELD,
+      NOTE_FIELD,
+      { key: 'email', label: 'メールアドレス', hint: '登録しているメールアドレス', input: 'email', optional: true, mono: true },
+      PHONE_FIELD,
     ],
   },
   {

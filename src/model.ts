@@ -4,7 +4,7 @@ import { toKind, type Kind } from './kinds.ts';
 
 export interface Entry {
   id: string;
-  /** 種類（ログイン・メール・銀行カード・その他）。種類によって使う欄が変わる（kinds.ts） */
+  /** 種類（ログイン・SNS・メール・銀行カード・その他）。種類によって使う欄が変わる（kinds.ts） */
   kind: Kind;
   title: string;
   /** お気に入り */
