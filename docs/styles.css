@@ -83,7 +83,7 @@ button.small { min-height: 36px; padding: 4px 12px; font-size: 0.9rem; }
 button:disabled { opacity: 0.5; }
 main > button { width: 100%; }
 
-input[type=text], input[type=password], input[type=search], input[type=url], input[type=email], textarea, select {
+input[type=text], input[type=password], input[type=search], input[type=url], input[type=email], input[type=tel], textarea, select {
   font: inherit;
   font-size: 16px; /* iOS の自動ズーム防止 */
   width: 100%;

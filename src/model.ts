@@ -22,6 +22,8 @@ export interface Entry {
   pin: string;
   /** メールのサーバー情報 */
   server: string;
+  /** 電話番号 */
+  phone: string;
   url: string;
   note: string;
   createdAt: number;
@@ -44,6 +46,8 @@ export interface Payload {
   modifiedAt: number;
   /** 最後に暗号化バックアップを書き出した時刻 */
   lastBackupAt: number | null;
+  /** メモの電話番号を電話番号の欄へコピーする処理を実行済みか（phone.ts） */
+  phoneMigrated: boolean;
 }
 
 export const AUTO_LOCK_CHOICES = [1, 3, 5, 10];
@@ -55,6 +59,7 @@ export function emptyPayload(): Payload {
     settings: { autoLockMinutes: 3, clipboardClearSeconds: 30, relockGraceSeconds: 0 },
     modifiedAt: Date.now(),
     lastBackupAt: null,
+    phoneMigrated: true,
   };
 }
 
@@ -81,6 +86,7 @@ export function normalizePayload(x: unknown): Payload {
       number: str(e?.number),
       pin: str(e?.pin),
       server: str(e?.server),
+      phone: str(e?.phone),
       url: str(e?.url),
       note: str(e?.note),
       createdAt: num(e?.createdAt, Date.now()),
@@ -97,5 +103,6 @@ export function normalizePayload(x: unknown): Payload {
     },
     modifiedAt: num(p.modifiedAt, base.modifiedAt),
     lastBackupAt: typeof p.lastBackupAt === 'number' ? p.lastBackupAt : null,
+    phoneMigrated: p.phoneMigrated === true,
   };
 }

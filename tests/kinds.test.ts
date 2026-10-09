@@ -8,7 +8,7 @@ import type { Entry } from '../src/model.ts';
 function entry(p: Partial<Entry>): Entry {
   return {
     id: '1', kind: 'login', favorite: false, title: 'T', username: '', password: '', email: '', displayName: '',
-    number: '', pin: '', server: '', url: '', note: '', createdAt: 0, updatedAt: 0, ...p,
+    number: '', pin: '', server: '', phone: '', url: '', note: '', createdAt: 0, updatedAt: 0, ...p,
   };
 }
 

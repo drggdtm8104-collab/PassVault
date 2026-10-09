@@ -32,6 +32,7 @@ function samplePayload(): Payload {
     number: '',
     pin: '',
     server: '',
+    phone: '',
     password: 'p@ss"word,\n改行',
     url: 'https://example.com',
     note: 'メモ',

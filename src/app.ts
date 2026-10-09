@@ -7,6 +7,7 @@ import { clearUnusedFields, KIND_IDS, KINDS, kindDef, subtitle, type FieldDef, t
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
+import { migratePhones } from './phone.ts';
 import { matchesQuery, parseQuery } from './search.ts';
 import {
   deleteBio,
@@ -280,6 +281,23 @@ function enterSession(file: VaultFile, dek: CryptoKey, payload: unknown, readOnl
   if (!readOnly) void requestPersistence();
   resetIdle();
   show(listScreen());
+  void runMigrations();
+}
+
+/** 解除直後に 1 回だけ行うデータの移行（閲覧モードでは保存せず表示にだけ反映） */
+async function runMigrations(): Promise<void> {
+  const s = session;
+  if (!s || s.payload.phoneMigrated) return;
+  const { payload, copied } = migratePhones(s.payload);
+  if (s.readOnly) {
+    s.payload = payload;
+    return;
+  }
+  await commit((p) => {
+    p.entries = payload.entries;
+    p.phoneMigrated = true;
+  }, { touch: copied > 0 }, s);
+  if (copied > 0) toast(`メモに書かれていた電話番号を ${copied} 件、電話番号の欄にコピーしました`);
 }
 
 // ---------------------------------------------------------------- アプリを離れたとき
@@ -811,7 +829,7 @@ function optionalField(label: string, input: FieldInput, hint?: string): HTMLEle
   return wrap;
 }
 
-const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'number', 'pin', 'server', 'url', 'note'];
+const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'phone', 'number', 'pin', 'server', 'url', 'note'];
 
 function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false): HTMLElement {
   const e = id ? findEntry(id) : undefined;
@@ -830,7 +848,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
     } else if (f.secret) {
       el = secretInput({ autocomplete: f.generate ? 'new-password' : 'off' });
     } else {
-      el = textInput('', { type: f.input === 'email' ? 'email' : f.input === 'url' ? 'url' : 'text', placeholder: f.placeholder });
+      el = textInput('', { type: f.input === 'email' || f.input === 'tel' || f.input === 'url' ? f.input : 'text', placeholder: f.placeholder });
     }
     if (f.numeric) el.inputMode = 'numeric';
     el.value = values[f.key];

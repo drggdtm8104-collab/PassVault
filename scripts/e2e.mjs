@@ -1,7 +1,9 @@
 // 画面の通し確認（Edge をヘッドレスで操作）。先に npm run build と npm run serve を実行しておく。
 // 使い方: node scripts/e2e.mjs [スクリーンショット保存先]
 import { chromium } from 'playwright-core';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8080/';
@@ -63,6 +65,9 @@ await page.getByLabel('ログイン ID').fill('me@example.com');
 assert.equal(await page.getByLabel('登録メールアドレス').count(), 0, '任意の欄は最初は隠れている');
 await btn(page, '＋ 登録メールアドレス').click();
 await page.getByLabel('登録メールアドレス').fill('contact@example.com');
+await btn(page, '＋ 電話番号').click();
+await page.getByLabel('電話番号').fill('090-1234-5678');
+assert.equal((await page.getByLabel('電話番号').boundingBox()).height, (await page.getByLabel('ログイン ID').boundingBox()).height, '電話番号欄も他と同じ高さ');
 const hEmail = (await page.getByLabel('登録メールアドレス').boundingBox()).height;
 const hId = (await page.getByLabel('ログイン ID').boundingBox()).height;
 assert.equal(hEmail, hId, `メール欄の高さ ${hEmail} が他の欄 ${hId} と同じ`);
@@ -76,6 +81,7 @@ await page.getByLabel('URL').fill('javascript:alert(1)');
 await btn(page, '保存').click();
 await page.getByText('更新：', { exact: false }).waitFor();
 await page.getByText('contact@example.com').waitFor();
+await page.getByText('090-1234-5678').waitFor();
 assert.equal(await page.getByText('ユーザー名').count(), 0, '空の項目は詳細に出さない');
 assert.equal(await btn(page, '開く').count(), 0, 'javascript: URL に「開く」ボタンを出さない');
 assert.ok(await page.getByText('Example <script>alert(1)</script>').first().isVisible(), 'HTML は文字として表示される');
@@ -364,7 +370,44 @@ await page.getByText('秒待ってください', { exact: false }).waitFor();
 assert.ok(await btn(page, '開く').isDisabled());
 step('5 回失敗すると待ち時間がかかる');
 
-const all = [...problems, ...other.problems].filter((p) => !p.includes('favicon'));
+// 電話番号の移行：電話番号の欄が無かった頃の形式のバックアップを復元すると、メモの番号がコピーされる
+const { createVault } = await import('../src/vault.ts');
+const oldPayload = {
+  entries: [{ id: 'old1', kind: 'login', title: '旧データ', username: 'old@example.com', password: 'pw', url: '', note: '窓口 0120-123-456\n担当 田中', createdAt: 1, updatedAt: 1 }],
+  settings: { autoLockMinutes: 3, clipboardClearSeconds: 30, relockGraceSeconds: 0 },
+  modifiedAt: 1,
+  lastBackupAt: null,
+};
+const { file: oldFile } = await createVault(MASTER, oldPayload);
+const oldPath = join(tmpdir(), 'passvault-e2e-old.json');
+writeFileSync(oldPath, JSON.stringify(oldFile));
+const third = await newPage();
+await third.page.goto(BASE);
+const chooser3 = third.page.waitForEvent('filechooser');
+await btn(third.page, 'バックアップから復元する').click();
+await (await chooser3).setFiles(oldPath);
+await third.page.getByLabel('バックアップ作成時のマスターパスワード').fill(MASTER);
+await btn(third.page, '復元する').click();
+await third.page.getByText('電話番号を 1 件', { exact: false }).waitFor();
+await third.page.getByText('旧データ').click();
+await third.page.getByText('0120-123-456').first().waitFor();
+assert.equal(await third.page.locator('.detail-row', { hasText: '電話番号' }).count(), 1, '電話番号の欄に入っている');
+assert.ok(await third.page.getByText('担当 田中', { exact: false }).isVisible(), 'メモはそのまま');
+await shot(third.page, '19-phone-migrated');
+// もう一度ロック → 解除しても、再びコピーの通知は出ない（1 回だけ）
+await third.page.locator('#toast.show').waitFor({ state: 'detached' });
+await btn(third.page, '一覧').click();
+await btn(third.page, 'ロック').click();
+await third.page.getByLabel('マスターパスワード').fill(MASTER);
+await btn(third.page, '開く').click();
+await third.page.getByText('旧データ').waitFor();
+await third.page.waitForTimeout(500);
+assert.equal(await third.page.locator('#toast.show', { hasText: '電話番号を' }).count(), 0, '移行は 1 回だけ');
+await third.page.getByText('旧データ').click();
+await third.page.locator('.detail-row', { hasText: '電話番号' }).waitFor();
+step('旧形式のデータ：メモの電話番号を電話番号の欄にコピー（メモは残す、1 回だけ）');
+
+const all = [...problems, ...other.problems, ...third.problems].filter((p) => !p.includes('favicon'));
 assert.deepEqual(all, [], 'コンソールエラー・CSP 違反なし');
 step('コンソールエラー・CSP 違反なし');
 

@@ -5,7 +5,7 @@ import type { Entry } from './model.ts';
 export type Kind = 'login' | 'email' | 'bank' | 'other';
 
 /** 種類によって使い分ける Entry の欄 */
-export type FieldKey = 'username' | 'password' | 'email' | 'displayName' | 'number' | 'pin' | 'server' | 'url' | 'note';
+export type FieldKey = 'username' | 'password' | 'email' | 'displayName' | 'phone' | 'number' | 'pin' | 'server' | 'url' | 'note';
 
 export interface FieldDef {
   key: FieldKey;
@@ -16,7 +16,7 @@ export interface FieldDef {
   secret?: boolean;
   /** 最初は「＋ ラベル」ボタンにして隠しておく任意の欄 */
   optional?: boolean;
-  input?: 'text' | 'email' | 'url' | 'textarea';
+  input?: 'text' | 'email' | 'tel' | 'url' | 'textarea';
   /** 数字のキーボードを出す */
   numeric?: boolean;
   /** パスワード生成器を使える */
@@ -34,6 +34,7 @@ export interface KindDef {
 
 const URL_FIELD: FieldDef = { key: 'url', label: 'URL', input: 'url', placeholder: 'https://', mono: true };
 const NOTE_FIELD: FieldDef = { key: 'note', label: 'メモ', input: 'textarea' };
+const PHONE_FIELD: FieldDef = { key: 'phone', label: '電話番号', input: 'tel', optional: true, mono: true };
 
 export const KINDS: KindDef[] = [
   {
@@ -45,6 +46,7 @@ export const KINDS: KindDef[] = [
       { key: 'password', label: 'パスワード', secret: true, generate: true },
       { key: 'email', label: '登録メールアドレス', hint: 'ログイン ID と別のときだけ', input: 'email', optional: true, mono: true },
       { key: 'displayName', label: 'ユーザー名', hint: 'ログインに使わない表示名など', optional: true },
+      PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
     ],
@@ -57,6 +59,7 @@ export const KINDS: KindDef[] = [
       { key: 'username', label: 'メールアドレス', input: 'email', placeholder: 'me@example.com', mono: true },
       { key: 'password', label: 'パスワード', secret: true, generate: true },
       { key: 'server', label: 'サーバー情報', hint: '受信・送信サーバー名やポート番号など', input: 'textarea', optional: true },
+      PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
     ],
@@ -70,6 +73,7 @@ export const KINDS: KindDef[] = [
       { key: 'pin', label: '暗証番号', secret: true, numeric: true },
       { key: 'username', label: 'ネットバンキングのログイン ID', mono: true },
       { key: 'password', label: 'ネットバンキングのパスワード', secret: true, generate: true },
+      PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
     ],
@@ -81,6 +85,7 @@ export const KINDS: KindDef[] = [
     fields: [
       { key: 'username', label: 'ID', hint: 'ID・番号・ネットワーク名など', mono: true },
       { key: 'password', label: 'パスワード', hint: 'パスワード・暗証番号など', secret: true, generate: true },
+      PHONE_FIELD,
       URL_FIELD,
       NOTE_FIELD,
     ],
@@ -115,7 +120,7 @@ export function subtitle(e: Entry): string {
 export function clearUnusedFields(e: Entry): Entry {
   const used = new Set(kindDef(e.kind).fields.map((f) => f.key));
   const out = { ...e };
-  for (const key of ['username', 'password', 'email', 'displayName', 'number', 'pin', 'server', 'url', 'note'] as const) {
+  for (const key of ['username', 'password', 'email', 'displayName', 'phone', 'number', 'pin', 'server', 'url', 'note'] as const) {
     if (!used.has(key)) out[key] = '';
   }
   return out;

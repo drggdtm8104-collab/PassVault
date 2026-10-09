@@ -52,6 +52,7 @@ const entries: Entry[] = [
     number: '',
     pin: '',
     server: '',
+    phone: '',
     password: '=1+2',
     url: 'https://a.example',
     note: '1行目\n2行目',
