@@ -163,7 +163,7 @@ const saveBox = await btn(page, '保存').boundingBox();
 assert.ok(checkBox.y < saveBox.y, '「更新が必要」は保存ボタンの前');
 await page.getByLabel('更新が必要').check();
 await btn(page, '保存').click();
-await page.locator('.flag', { hasText: '要更新' }).waitFor();
+await page.locator('.flag', { hasText: '確認' }).waitFor();
 await page.getByText('普通 1234567').waitFor();
 assert.equal(await page.getByText('4321').count(), 0, '暗証番号は最初は伏せ字');
 await page.getByRole('button', { name: '表示' }).first().click();
@@ -190,8 +190,14 @@ for (const b of await page.locator('.list .badge').all()) {
   assert.ok(Math.abs(listBox.x + listBox.width - (box.x + box.width)) < 24, '種類の表示が右端にある');
 }
 await shot(page, '17b-list-all');
-assert.equal(await page.locator('.list li', { hasText: '楽天銀行' }).locator('.flag').textContent(), '要更新', '一覧に「要更新」マーク');
-assert.equal(await page.locator('.list .flag').count(), 1, '要更新の項目だけにマーク');
+assert.equal(await page.locator('.list li', { hasText: '楽天銀行' }).locator('.flag').textContent(), '確認', '一覧に「確認」マーク');
+assert.equal(await page.locator('.list .flag').count(), 1, '印の付いた項目だけにマーク');
+// 「確認」で絞り込む
+assert.ok((await filter.locator('option[value="check"]').textContent()).includes('確認（1）'));
+await filter.selectOption('check');
+await page.locator('.list .name', { hasText: '楽天銀行' }).waitFor();
+assert.equal(await page.locator('.list .name').count(), 1, '印の付いた項目だけを表示');
+await filter.selectOption('all');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
 // SNS：入力欄の順番と＋で追加する欄
 await btn(page, '追加').click();
@@ -238,18 +244,18 @@ await shot(page, '22-import-review');
 const item = (name) => page.locator('.import-item', { hasText: name });
 assert.equal(await item('楽天銀行').locator('input').isChecked(), false, '重複は最初はチェックなし');
 assert.equal(await item('Netflix').locator('input').isChecked(), true);
-assert.ok((await item('ポイント').textContent()).includes('要更新'), '自信がない項目は要更新');
+assert.ok((await item('ポイント').textContent()).includes('確認'), '自信がない項目は「確認」');
 assert.ok(!(await page.locator('main').textContent()).includes('nf-pass'), '確認画面にパスワードを表示しない');
 page.once('dialog', (d) => d.accept());
 await page.getByRole('button', { name: /^登録する（3 件）$/ }).click();
 await page.locator('.list .name', { hasText: 'Netflix' }).waitFor();
 assert.equal(await page.locator('.list li', { hasText: 'Instagram' }).locator('.badge').textContent(), 'SNS');
-assert.equal(await page.locator('.list li', { hasText: 'ポイント' }).locator('.flag').textContent(), '要更新');
+assert.equal(await page.locator('.list li', { hasText: 'ポイント' }).locator('.flag').textContent(), '確認');
 assert.equal(await page.locator('.list .name', { hasText: '楽天銀行' }).count(), 1, '重複は登録しない');
 await page.locator('.list .name', { hasText: 'Instagram' }).click();
 await page.getByText('hiro_ig').waitFor();
 await btn(page, '一覧').click();
-step('メモからの取り込み：読み取り・確認画面・重複除外・要更新の印・SNS 判定');
+step('メモからの取り込み：読み取り・確認画面・重複除外・「確認」の印・SNS 判定');
 
 // 暗号化バックアップ
 await btn(page, '設定').click();

@@ -3,7 +3,7 @@
 import { BioCancelledError, BioUnavailableError, bioAvailable, enrollBio, unlockBio, type BioRecord } from './biometric.ts';
 import { wipe } from './bytes.ts';
 import { clear, h } from './dom.ts';
-import { clearUnusedFields, KIND_IDS, KINDS, kindDef, subtitle, type FieldDef, type FieldKey, type Kind } from './kinds.ts';
+import { clearUnusedFields, isKind, KIND_IDS, KINDS, kindDef, subtitle, type FieldDef, type FieldKey, type Kind } from './kinds.ts';
 import { DEFAULT_GEN, generatedBits, generatePassword, type GenOptions } from './generator.ts';
 import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload, type Entry, type Payload } from './model.ts';
 import { toCsv, toText } from './plaintext.ts';
@@ -664,11 +664,14 @@ function needsBackup(p: Payload): boolean {
 }
 
 /** 一覧の絞り込み（すべて・お気に入り・種類）。ロックするまで覚えておく */
-type ListFilter = Kind | 'all' | 'fav';
+type ListFilter = Kind | 'all' | 'fav' | 'check';
 let listFilter: ListFilter = 'all';
 
 function inFilter(e: Entry, f: ListFilter): boolean {
-  return f === 'all' || (f === 'fav' ? e.favorite : e.kind === f);
+  if (f === 'all') return true;
+  if (f === 'fav') return e.favorite;
+  if (f === 'check') return e.needsUpdate;
+  return e.kind === f;
 }
 
 function listScreen(query = ''): HTMLElement {
@@ -677,8 +680,8 @@ function listScreen(query = ''): HTMLElement {
   // 絞り込みはプルダウンメニュー（iPhone では画面下に選択肢が出る）
   const count = (k: ListFilter) => s.payload.entries.filter((e) => inFilter(e, k)).length;
   const filter = h('select', { class: 'filter' },
-    ...(['all', 'fav', ...KIND_IDS] as const).map((k) => {
-      const label = k === 'all' ? 'すべて' : k === 'fav' ? '★ お気に入り' : kindDef(k).label;
+    ...(['all', 'fav', 'check', ...KIND_IDS] as const).map((k) => {
+      const label = k === 'all' ? 'すべて' : k === 'fav' ? '★ お気に入り' : k === 'check' ? '確認' : kindDef(k).label;
       return h('option', { value: k, selected: k === listFilter }, `${label}（${count(k)}）`);
     }),
   );
@@ -703,9 +706,9 @@ function listScreen(query = ''): HTMLElement {
           h('span', { class: 'title' },
             e.favorite ? h('span', { class: 'star', 'aria-label': 'お気に入り' }, '★') : null,
             h('span', { class: 'name' }, e.title || '（名前なし）'),
-            e.needsUpdate ? h('span', { class: 'flag' }, '要更新') : null,
+            e.needsUpdate ? h('span', { class: 'flag' }, '確認') : null,
             // 種類は右端に固定（絞り込み中の種類と同じなら出さない）
-            listFilter === 'all' || listFilter === 'fav' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
+            listFilter === 'all' || listFilter === 'fav' || listFilter === 'check' ? h('span', { class: 'badge' }, kindDef(e.kind).label) : null,
           ),
           h('span', { class: 'sub' }, subtitle(e)),
         ),
@@ -718,7 +721,10 @@ function listScreen(query = ''): HTMLElement {
   const actions = s.readOnly
     ? [button('終了', () => lock())]
     : [
-        button('追加', () => show(editScreen(null, listFilter === 'all' || listFilter === 'fav' ? 'login' : listFilter, listFilter === 'fav')), 'primary small'),
+        button('追加', () => {
+          // 種類で絞り込み中ならその種類、お気に入り・確認で絞り込み中なら最初からその印を付ける
+          show(editScreen(null, isKind(listFilter) ? listFilter : 'login', listFilter === 'fav', listFilter === 'check'));
+        }, 'primary small'),
         button('設定', () => show(settingsScreen()), 'small'),
         button('ロック', () => lock(), 'small'),
       ];
@@ -815,7 +821,7 @@ function detailScreen(id: string): HTMLElement {
       ro ? null : favButton(e),
       ro ? null : button('編集', () => show(editScreen(e.id)), 'small'),
     ].filter(Boolean) as Node[],
-    e.needsUpdate ? h('p', null, h('span', { class: 'flag' }, '要更新')) : null,
+    e.needsUpdate ? h('p', null, h('span', { class: 'flag' }, '確認')) : null,
     rows.some(Boolean) ? h('div', { class: 'card' }, ...rows) : h('p', { class: 'muted' }, '名前以外は未入力です。'),
     h('p', { class: 'muted' }, `種類：${def.label}　更新：${formatDate(e.updatedAt)}`),
     ro ? null : button('削除', () => {
@@ -880,7 +886,7 @@ function optionalField(label: string, input: FieldInput): HTMLElement {
 
 const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'phone', 'number', 'pin', 'server', 'url', 'note'];
 
-function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false): HTMLElement {
+function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false, defaultNeedsUpdate = false): HTMLElement {
   const e = id ? findEntry(id) : undefined;
   let kind: Kind = e?.kind ?? defaultKind;
   const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: kindDef(kind).titlePlaceholder });
@@ -889,7 +895,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
   const kindTabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': '種類' });
   const fieldsBox = h('div', { class: 'stack fields' });
   const err = h('p', { class: 'error', role: 'alert' });
-  const needsUpdate = h('input', { type: 'checkbox', checked: e?.needsUpdate ?? false });
+  const needsUpdate = h('input', { type: 'checkbox', checked: e?.needsUpdate ?? defaultNeedsUpdate });
 
   const makeInput = (f: FieldDef): FieldInput => {
     let el: FieldInput;
@@ -1246,7 +1252,7 @@ function importReviewScreen(drafts: Draft[]): HTMLElement {
       const entries = chosen.map(({ d }) => ({ ...d.entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now }));
       await commit((p) => { p.entries.push(...entries); });
       show(listScreen());
-      alert(`${entries.length} 件を登録しました。\n\n「要更新」の印が付いた項目は、内容を確認してから印を外してください。\n\n確認が済んだら、標準メモの元のデータを削除してください（「最近削除した項目」からも）。`);
+      alert(`${entries.length} 件を登録しました。\n\n「確認」の印が付いた項目は、内容を確認してから印を外してください（一覧の「表示」で「確認」を選ぶと絞り込めます）。\n\n確認が済んだら、標準メモの元のデータを削除してください（「最近削除した項目」からも）。`);
     });
   }, 'primary');
   save.append('登録する（', count, ' 件）');
@@ -1257,7 +1263,7 @@ function importReviewScreen(drafts: Draft[]): HTMLElement {
   return screen(
     '取り込みの確認',
     [button('やり直す', () => show(importScreen()))],
-    h('p', null, `${drafts.length} 件を読み取りました。`, flagged ? `うち ${flagged} 件は「要更新」の印を付けて登録します。` : ''),
+    h('p', null, `${drafts.length} 件を読み取りました。`, flagged ? `うち ${flagged} 件は「確認」の印を付けて登録します。` : ''),
     h('ul', { class: 'list import-list' },
       ...picks.map(({ d, dup, box }) => {
         const e = d.entry;
@@ -1267,7 +1273,7 @@ function importReviewScreen(drafts: Draft[]): HTMLElement {
             h('div', { class: 'import-body' },
               h('div', { class: 'title' },
                 h('span', { class: 'name' }, e.title || '（名前なし）'),
-                e.needsUpdate ? h('span', { class: 'flag' }, '要更新') : null,
+                e.needsUpdate ? h('span', { class: 'flag' }, '確認') : null,
                 h('span', { class: 'badge' }, kindDef(e.kind).label),
               ),
               line('ID', e.username),
