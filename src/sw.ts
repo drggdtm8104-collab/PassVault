@@ -2,11 +2,12 @@
 // アプリ本体のファイルを端末に保存し、オフラインでも開けるようにする。
 // 外部への通信は行わない。同じサイトのファイル以外は扱わない。
 
-declare const __APP_VERSION__: string;
+/** バージョン番号＋中身のハッシュ。ファイルが変われば必ず変わる */
+declare const __BUILD_ID__: string;
 declare const __PRECACHE__: string[];
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
-const CACHE = `passvault-${__APP_VERSION__}`;
+const CACHE = `passvault-${__BUILD_ID__}`;
 
 sw.addEventListener('install', (e) => {
   e.waitUntil(
