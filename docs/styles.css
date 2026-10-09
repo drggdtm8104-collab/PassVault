@@ -106,6 +106,13 @@ textarea { resize: vertical; }
 .check input { width: 20px; height: 20px; flex-shrink: 0; }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .hidden { display: none; }
+.import-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; }
+.import-item > input { width: 20px; height: 20px; margin-top: 4px; flex-shrink: 0; }
+.import-body { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
+.import-body .title { font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 1rem; }
+.import-body .title .name { flex: 1; min-width: 0; }
+.import-body small { display: block; color: var(--warn-text); }
+.import-list + button { margin-top: 16px; }
 .star { color: #e0a100; flex-shrink: 0; }
 .flag { display: inline-block; flex-shrink: 0; padding: 0 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-text); font-size: 0.7rem; font-weight: 700; }
 button.fav { font-size: 1.1rem; min-width: 44px; }

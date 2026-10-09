@@ -9,7 +9,8 @@ import { AUTO_LOCK_CHOICES, RELOCK_GRACE_CHOICES, emptyPayload, normalizePayload
 import { toCsv, toText } from './plaintext.ts';
 import { migrateSns } from './migrate-sns.ts';
 import { migratePhones } from './phone.ts';
-import { matchesQuery, parseQuery } from './search.ts';
+import { matchesQuery, normalizeForSearch, parseQuery } from './search.ts';
+import { parseMemo, type Draft } from './importer.ts'; // 【一時的な機能】メモからの取り込み
 import {
   deleteBio,
   deleteVault,
@@ -1096,6 +1097,12 @@ function settingsScreen(): HTMLElement {
       h('p', null, '誰でも読めるファイルとして書き出します。乗り換えや紙での保管が必要なときだけ使ってください。'),
       button('平文で書き出す…', () => show(plainExportScreen()), 'danger'),
     ),
+    // 【一時的な機能】メモからの取り込み
+    h('section', null,
+      h('h2', null, 'メモから取り込む'),
+      h('p', null, '標準メモに書いた ID・パスワードを貼り付けて、まとめて登録します。'),
+      button('メモから取り込む…', () => show(importScreen())),
+    ),
     h('section', null,
       h('h2', null, 'データ'),
       h('div', { class: 'stack' },
@@ -1179,6 +1186,110 @@ function bioEnrollScreen(): HTMLElement {
     step2,
   );
 }
+
+// ---------------------------------------------------------------- 【一時的な機能】メモからの取り込み
+//
+// 標準メモから移すための機能。取り込みが済んだら、この区切りの中・importer.ts・設定画面の入口を削除する。
+
+function importScreen(): HTMLElement {
+  const ta = h('textarea', {
+    rows: 12,
+    autocapitalize: 'none',
+    autocorrect: 'off',
+    spellcheck: false,
+    placeholder: '☑Amazon\nメアド：…\nパスワード：…',
+  });
+  const err = h('p', { class: 'error', role: 'alert' });
+  const read = button('読み取る', () => {
+    err.textContent = '';
+    // 全パスワードがクリップボードに残らないよう、ボタン操作の中で消去を試みる
+    navigator.clipboard.writeText('').catch(() => {});
+    const drafts = parseMemo(ta.value);
+    if (drafts.length === 0) {
+      err.textContent = '読み取れる項目がありませんでした。';
+      return;
+    }
+    ta.value = '';
+    show(importReviewScreen(drafts));
+  }, 'primary');
+
+  return screen(
+    'メモから取り込む',
+    [button('戻る', () => show(settingsScreen()))],
+    h('p', null, '標準メモの内容をコピーして、下に貼り付けてください。読み取りはこの端末の中だけで行います。'),
+    ta,
+    err,
+    read,
+  );
+}
+
+function importReviewScreen(drafts: Draft[]): HTMLElement {
+  const s = session!;
+  // 既に登録済みのもの（名前とログイン ID が同じ）は、二重登録しないよう最初はチェックを外す
+  const key = (e: Entry) => `${normalizeForSearch(e.title)}\u0000${e.username}`;
+  const existing = new Set(s.payload.entries.map(key));
+  const picks = drafts.map((d) => {
+    const dup = existing.has(key(d.entry));
+    return { d, dup, box: h('input', { type: 'checkbox', checked: !dup }) };
+  });
+
+  const count = h('span');
+  const updateCount = () => { count.textContent = String(picks.filter((p) => p.box.checked).length); };
+  for (const p of picks) p.box.addEventListener('change', updateCount);
+  updateCount();
+
+  const save = button('', () => {
+    const chosen = picks.filter((p) => p.box.checked);
+    if (chosen.length === 0) return;
+    void busy(save, '登録中…', async () => {
+      const now = Date.now();
+      const entries = chosen.map(({ d }) => ({ ...d.entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now }));
+      await commit((p) => { p.entries.push(...entries); });
+      show(listScreen());
+      alert(`${entries.length} 件を登録しました。\n\n「要更新」の印が付いた項目は、内容を確認してから印を外してください。\n\n確認が済んだら、標準メモの元のデータを削除してください（「最近削除した項目」からも）。`);
+    });
+  }, 'primary');
+  save.append('登録する（', count, ' 件）');
+
+  const flagged = drafts.filter((d) => d.entry.needsUpdate).length;
+  const line = (label: string, value: string) => (value ? h('div', null, h('span', { class: 'muted' }, `${label}：`), value) : null);
+
+  return screen(
+    '取り込みの確認',
+    [button('やり直す', () => show(importScreen()))],
+    h('p', null, `${drafts.length} 件を読み取りました。`, flagged ? `うち ${flagged} 件は「要更新」の印を付けて登録します。` : ''),
+    h('ul', { class: 'list import-list' },
+      ...picks.map(({ d, dup, box }) => {
+        const e = d.entry;
+        return h('li', null,
+          h('label', { class: 'import-item' },
+            box,
+            h('div', { class: 'import-body' },
+              h('div', { class: 'title' },
+                h('span', { class: 'name' }, e.title || '（名前なし）'),
+                e.needsUpdate ? h('span', { class: 'flag' }, '要更新') : null,
+                h('span', { class: 'badge' }, kindDef(e.kind).label),
+              ),
+              line('ID', e.username),
+              line('メール', e.email),
+              line('ユーザー名', e.displayName),
+              line('口座・カード', e.number),
+              line('電話', e.phone),
+              line('URL', e.url),
+              h('div', null, h('span', { class: 'muted' }, 'パスワード：'), e.password ? 'あり' : 'なし', e.pin ? '　暗証番号：あり' : ''),
+              e.note ? h('div', { class: 'note' }, h('span', { class: 'muted' }, 'メモ：'), e.note) : null,
+              dup ? h('small', null, '同じ名前・ID の項目が登録済みです') : null,
+              ...d.issues.map((i) => h('small', null, i)),
+            ),
+          ),
+        );
+      }),
+    ),
+    save,
+  );
+}
+
+// ---------------------------------------------------------------- 【一時的な機能】ここまで
 
 function changePasswordScreen(): HTMLElement {
   const cur = secretInput({ autofocus: true, autocomplete: 'current-password' });

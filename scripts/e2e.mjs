@@ -222,6 +222,35 @@ assert.ok((await page.getByLabel('表示').locator('option[value="fav"]').textCo
 await page.getByLabel('表示').selectOption('all');
 step('お気に入りの追加・解除、お気に入りでの絞り込み');
 
+// 【一時的な機能】メモからの取り込み
+await btn(page, '設定').click();
+await btn(page, 'メモから取り込む…').click();
+await page.locator('textarea').fill([
+  '☑Netflix', 'メアド：nf@example.com', 'パスワード：nf-pass', '',
+  '☑Instagram', 'メアド：ig@example.com', 'ユーザー名：hiro_ig', 'パスワード：ig-pass', '',
+  '☑楽天銀行', '口座番号：普通 1234567', '暗証番号：4321', '',
+  '☑ポイント', '会員番号：0012', '謎の見出し：xyz',
+].join('\n'));
+await btn(page, '読み取る').click();
+await page.getByText('4 件を読み取りました', { exact: false }).waitFor();
+await shot(page, '22-import-review');
+// 登録済みの「楽天銀行」は重複としてチェックが外れている
+const item = (name) => page.locator('.import-item', { hasText: name });
+assert.equal(await item('楽天銀行').locator('input').isChecked(), false, '重複は最初はチェックなし');
+assert.equal(await item('Netflix').locator('input').isChecked(), true);
+assert.ok((await item('ポイント').textContent()).includes('要更新'), '自信がない項目は要更新');
+assert.ok(!(await page.locator('main').textContent()).includes('nf-pass'), '確認画面にパスワードを表示しない');
+page.once('dialog', (d) => d.accept());
+await page.getByRole('button', { name: /^登録する（3 件）$/ }).click();
+await page.locator('.list .name', { hasText: 'Netflix' }).waitFor();
+assert.equal(await page.locator('.list li', { hasText: 'Instagram' }).locator('.badge').textContent(), 'SNS');
+assert.equal(await page.locator('.list li', { hasText: 'ポイント' }).locator('.flag').textContent(), '要更新');
+assert.equal(await page.locator('.list .name', { hasText: '楽天銀行' }).count(), 1, '重複は登録しない');
+await page.locator('.list .name', { hasText: 'Instagram' }).click();
+await page.getByText('hiro_ig').waitFor();
+await btn(page, '一覧').click();
+step('メモからの取り込み：読み取り・確認画面・重複除外・要更新の印・SNS 判定');
+
 // 暗号化バックアップ
 await btn(page, '設定').click();
 const [dl] = await Promise.all([page.waitForEvent('download'), btn(page, '暗号化バックアップを保存').click()]);
