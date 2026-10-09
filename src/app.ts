@@ -722,8 +722,8 @@ function listScreen(query = ''): HTMLElement {
     ? [button('終了', () => lock())]
     : [
         button('追加', () => {
-          // 種類で絞り込み中ならその種類、お気に入り・確認で絞り込み中なら最初からその印を付ける
-          show(editScreen(null, isKind(listFilter) ? listFilter : 'login', listFilter === 'fav', listFilter === 'check'));
+          // 種類で絞り込み中ならその種類、お気に入りで絞り込み中なら最初からお気に入り（「更新が必要」は常に外して始める）
+          show(editScreen(null, isKind(listFilter) ? listFilter : 'login', listFilter === 'fav'));
         }, 'primary small'),
         button('設定', () => show(settingsScreen()), 'small'),
         button('ロック', () => lock(), 'small'),
@@ -886,7 +886,7 @@ function optionalField(label: string, input: FieldInput): HTMLElement {
 
 const ALL_FIELD_KEYS: FieldKey[] = ['username', 'password', 'email', 'displayName', 'phone', 'number', 'pin', 'server', 'url', 'note'];
 
-function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false, defaultNeedsUpdate = false): HTMLElement {
+function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavorite = false): HTMLElement {
   const e = id ? findEntry(id) : undefined;
   let kind: Kind = e?.kind ?? defaultKind;
   const title = textInput(e?.title ?? '', { autofocus: !e, placeholder: kindDef(kind).titlePlaceholder });
@@ -895,7 +895,7 @@ function editScreen(id: string | null, defaultKind: Kind = 'login', defaultFavor
   const kindTabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': '種類' });
   const fieldsBox = h('div', { class: 'stack fields' });
   const err = h('p', { class: 'error', role: 'alert' });
-  const needsUpdate = h('input', { type: 'checkbox', checked: e?.needsUpdate ?? defaultNeedsUpdate });
+  const needsUpdate = h('input', { type: 'checkbox', checked: e?.needsUpdate ?? false });
 
   const makeInput = (f: FieldDef): FieldInput => {
     let el: FieldInput;

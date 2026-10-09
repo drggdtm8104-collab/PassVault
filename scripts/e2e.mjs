@@ -197,6 +197,10 @@ assert.ok((await filter.locator('option[value="check"]').textContent()).includes
 await filter.selectOption('check');
 await page.locator('.list .name', { hasText: '楽天銀行' }).waitFor();
 assert.equal(await page.locator('.list .name').count(), 1, '印の付いた項目だけを表示');
+// 「確認」で絞り込み中でも、追加画面の「更新が必要」は外れた状態で始まる
+await btn(page, '追加').click();
+assert.equal(await page.getByLabel('更新が必要').isChecked(), false, '追加時は「更新が必要」のチェックなし');
+await btn(page, 'キャンセル').click();
 await filter.selectOption('all');
 await page.getByText('Example <script>', { exact: false }).first().waitFor();
 // SNS：入力欄の順番と＋で追加する欄
